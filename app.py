@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import subprocess
+import sys
 import numpy as np
 import time
 
@@ -47,16 +49,36 @@ if st.session_state.etape == 1:
         strategie = st.selectbox("Choix Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "SCAFFOLD"]) # [cite: 8]
     with c_h:
         rounds = st.slider("Rounds", 1, 200, 100) # [cite: 11]
-        e_col, c_col = st.columns(2)
+        e_col, lr_col = st.columns(2)
         with e_col:
             epochs = st.select_slider("Epochs locales", options=[1, 2, 3]) # [cite: 12]
-        with c_col:
-            clients = st.number_input("Clients", value=120) # [cite: 12]
+        with lr_col:
+            lr = st.number_input("Learning Rate", value=0.01, format="%.4f", step=0.001) # [cite: 12]
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀 LANCER L'EXPÉRIENCE", use_container_width=True, type="primary"): # 
-        st.session_state.etape = 2
-        st.rerun()
+    if st.button("🚀 LANCER L'EXPÉRIENCE", use_container_width=True, type="primary"):
+        if model_file is not None:
+            # 1. Sauvegarde du modèle utilisateur
+            with open("pytorchexample/user_model.py", "wb") as fin:
+                fin.write(model_file.getbuffer())
+
+            # 2. Préparation d'une SEULE chaîne de config bien formatée
+            # IMPORTANT : les textes DOIVENT avoir des doubles guillemets (")
+            # J'ajoute une valeur par défaut pour learning-rate si non définie
+            cmd = [
+            "flwr", "run", ".", 
+            "--run-config", f"strategy='{strategie.lower()}'",
+            "--run-config", f"num-server-rounds={rounds}",
+            "--run-config", f"learning-rate={lr}"
+            ]
+            # 4. Un SEUL lancement en arrière-plan
+            subprocess.Popen(cmd)
+            
+            # 5. Changement d'état et redirection
+            st.session_state.etape = 2
+            st.rerun()
+        else:
+            st.error("⚠️ Veuillez importer un modèle (.py) avant de lancer.")
 
 # --- ÉCRAN 2 : ENTRAÎNEMENT ---
 elif st.session_state.etape == 2:

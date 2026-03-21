@@ -42,7 +42,7 @@ quickstart-pytorch
 Install the dependencies defined in `pyproject.toml` as well as the `pytorchexample` package.
 
 ```bash
-pip install -e .
+pip install -r requirements.txt
 ```
 
 ## Run the project

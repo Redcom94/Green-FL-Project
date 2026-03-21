@@ -89,14 +89,6 @@ def main(grid: Grid, context: Context) -> None:
     strategy.set_save_path(save_path)
 
     # 5. Lancement de l'entraînement
-    print(f"🚀 Starting Federated Learning with strategy: {strategy_name.upper()}")
-    result = strategy.start(
-        grid=grid,
-        initial_arrays=arrays,
-        train_config=ConfigRecord({"lr": lr}),
-        num_rounds=num_rounds,
-        evaluate_fn=global_evaluate,
-    )
     tracker=EmissionsTracker(
         project_name=config.get("strategy", "fedavg").lower(),
         output_dir=str(save_path),
@@ -105,6 +97,7 @@ def main(grid: Grid, context: Context) -> None:
         )
     tracker.start()
     try:
+        print(f"🚀 Starting Federated Learning with strategy: {strategy_name.upper()}")
         result = strategy.start(
             grid=grid,
             initial_arrays=arrays,

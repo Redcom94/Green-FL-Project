@@ -6,3 +6,4 @@ codecarbon==3.2.4
 pandas==2.3.3
 datasets==4.5.0
 streamlit==1.55.0
+-e .

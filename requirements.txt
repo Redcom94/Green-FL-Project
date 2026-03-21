@@ -2,7 +2,7 @@ flwr==1.26.1
 flwr-datasets==0.6.0
 torch==2.8.0
 torchvision==0.23.0
-codecarbon==3.2.4
+git+https://github.com/mlco2/codecarbon.git
 pandas==2.3.3
 datasets==4.5.0
 streamlit==1.55.0

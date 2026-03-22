@@ -101,7 +101,7 @@ if st.session_state.etape == 1:
     st.markdown("#### 🚀 Stratégie & Hyperparamètres")
     c_s, c_h = st.columns([1, 2])
     with c_s:
-        strategie = st.selectbox("Choix Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "SCAFFOLD"])
+        strategie = st.selectbox("Choix Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
     with c_h:
         rounds = st.slider("Rounds", 1, 200, 100)
         e_col, c_col, lr_col = st.columns(3)

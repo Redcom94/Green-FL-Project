@@ -56,7 +56,7 @@ def read_csv_safely(path):
     except Exception:
         return None
 
-def write_pyproject_with_config(strategy, rounds, epochs, clients, lr):
+def write_pyproject_with_config(strategy, rounds, epochs, clients, lr, clients_training, clients_evaluation, extra_opts):
     path = PROJECT_DIR / "pyproject.toml"
     data = toml.load(path)
     data["tool"]["flwr"]["app"]["config"]["strategy"] = strategy.lower()
@@ -65,7 +65,12 @@ def write_pyproject_with_config(strategy, rounds, epochs, clients, lr):
     data["tool"]["flwr"]["app"]["config"]["fraction-train"] = 1.0
     data["tool"]["flwr"]["app"]["config"]["learning-rate"] = lr
     data["tool"]["flwr"]["app"]["config"].pop("franction-train", None)
-    data["superlink"]["local"]["options"]["num-supernodes"] = clients
+    data["tool"]["flwr"]["app"]["config"]["num-supernodes"] = clients
+    data["tool"]["flwr"]["app"]["config"]["num-supernodes-training"] = clients_training
+    data["tool"]["flwr"]["app"]["config"]["num-supernodes-evaluation"] = clients_evaluation
+    # Injection des options dynamiques (FedProx, Adam, etc.)
+    for key, val in extra_opts.items():
+        data["tool"]["flwr"]["app"]["config"][key] = val
     with open(path, "w") as f:
         toml.dump(data, f)
 
@@ -111,15 +116,44 @@ if st.session_state.etape == 1:
             clients = st.number_input("Clients", min_value=1, value=10, step=1)
         with lr_col:
             lr = st.number_input("Learning Rate", min_value=0.0001, max_value=1.0, value=0.01, format="%.4f", step=0.001)
+        with st.expander("Options avancées"):
+            ct_col, ce_col = st.columns(2)
+            with ct_col:
+                clients_training = st.number_input("Clients d'entraînement", min_value=1, value=8, step=1)
+            with ce_col:
+                clients_evaluation = st.number_input("Clients d'évaluation", min_value=1, value=5, step=1)
+            st.divider()
+            st.markdown("**Proportions de sélection**")
+            f_col1, f_col2 = st.columns(2)
+            with f_col1:
+                frac_train = st.slider("Fraction entraînement", 0.1, 1.0, 1.0, help="Pourcentage de clients actifs par round d'entraînement")
+            with f_col2:
+                frac_eval = st.slider("Fraction évaluation", 0.1, 1.0, 1.0, help="Pourcentage de clients actifs par round de validation")
+            # --- Nouveaux paramètres dynamiques ---
+            if strategie == "FedProx":
+                proximal_mu = st.slider("Proximal Mu (μ)", 0.0, 1.0, 0.1)
+            elif strategie in ["FedAdam", "FedYogi"]:
+                c1, c2 = st.columns(2)
+                server_lr = c1.number_input("Server LR (eta)", value=1.0, step=0.1)
+                tau = c2.number_input("Tau (stabilité)", value=1e-9, format="%.1e")
+                b1, b2 = st.columns(2)
+                beta_1 = b1.slider("Beta 1", 0.0, 1.0, 0.9)
+                beta_2 = b2.slider("Beta 2", 0.0, 1.0, 0.99)
+            elif strategie == "FedAdagrad":
+                c1, c2 = st.columns(2)
+                server_lr = c1.number_input("Server LR (eta)", value=1.0, step=0.1)
+                tau = c2.number_input("Tau (stabilité)", value=1e-9, format="%.1e")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("Configuration sélectionnée")
-    r1, r2, r3, r4, r5 = st.columns(5)
+    r1, r2, r3, r4, r5, r6, r7 = st.columns(7)
     r1.metric("Stratégie", strategie)
     r2.metric("Dataset", dataset)
     r3.metric("Rounds", int(rounds))
     r4.metric("Epochs", int(epochs))
     r5.metric("Clients", int(clients))
+    r6.metric("Clients d'entraînement", int(clients_training))
+    r7.metric("Clients d'évaluation", int(clients_evaluation))
 
     model_name = model_file.name if model_file else "Aucun fichier importé"
     st.caption(f"Modèle sélectionné : {model_name}")
@@ -131,10 +165,24 @@ if st.session_state.etape == 1:
         st.session_state.selected_rounds = int(rounds)
         st.session_state.selected_epochs = int(epochs)
         st.session_state.selected_clients = int(clients)
+        st.session_state.selected_clients_training = int(clients_training)
+        st.session_state.selected_clients_evaluation = int(clients_evaluation)
         st.session_state.selected_model_name = model_name
         st.session_state.known_csv_files_before_run = get_all_emission_csvs()
         st.session_state.current_run_csv = None
-        write_pyproject_with_config(strategie, int(rounds), int(epochs), int(clients), lr)
+        # Préparer les options spécifiques
+        extra_opts = {}
+        extra_opts["fraction-train"] = frac_train
+        extra_opts["fraction-evaluate"] = frac_eval
+        if strategie == "FedProx":
+            extra_opts["proximal-mu"] = proximal_mu
+        elif strategie in ["FedAdam", "FedYogi", "FedAdagrad"]:
+            extra_opts["server-learning-rate"] = server_lr
+            extra_opts["tau"] = tau
+            if strategie != "FedAdagrad":
+                extra_opts["beta-1"] = beta_1
+                extra_opts["beta-2"] = beta_2
+        write_pyproject_with_config(strategie, int(rounds), int(epochs), int(clients), lr, int(clients_training), int(clients_evaluation),  extra_opts)
         env = os.environ.copy()
         env["WANDB_MODE"] = "offline"
         st.session_state.fl_process = subprocess.Popen(["flwr", "run", "."], cwd=PROJECT_DIR, env=env)
@@ -309,3 +357,4 @@ elif st.session_state.etape == 3:
         st.session_state.current_run_csv = None
         st.session_state.fl_process = None
         st.rerun()
+

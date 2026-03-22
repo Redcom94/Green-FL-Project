@@ -42,9 +42,11 @@ def main(grid: Grid, context: Context) -> None:
     lr = config.get("learning-rate", 0.01)
     
     # Handle the typo gracefully
-    fraction_train = config.get("fraction-train", config.get("franction-train", 0.1))
+    fraction_train = config.get("fraction-train", 0.1)
     fraction_evaluate = config.get("fraction-evaluate", 0.1)
-
+    min_available_nodes = config.get("num-supernodes", 10)
+    min_train = config.get("num-supernodes-training", 8)
+    min_eval = config.get("num-supernodes-evaluation", 5)
     # 2. Model Initialization
     global_model = Net()
     model_path = Path("final_model.pt")
@@ -56,9 +58,9 @@ def main(grid: Grid, context: Context) -> None:
     strategy_kwargs = {
         "fraction_train": fraction_train,
         "fraction_evaluate": fraction_evaluate,
-        "min_train_nodes": 8,          
-        "min_evaluate_nodes": 5,
-        "min_available_nodes": 10,
+        "min_train_nodes": min_train,          
+        "min_evaluate_nodes": min_eval,
+        "min_available_nodes": min_available_nodes,
     }
     if strategy_name == "fedprox":
         strategy_kwargs["proximal_mu"] = config.get("proximal-mu", 0.1)

@@ -9,6 +9,7 @@ framework: [torch, torchvision]
 ### Install dependencies and project
 
 Install the dependencies defined in `pyproject.toml` as well as the `pytorchexample` package.
+Use Python 3.13.5
 
 ```bash
 pip install -r requirements.txt

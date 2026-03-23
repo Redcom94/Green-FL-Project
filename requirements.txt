@@ -96,7 +96,6 @@ python-dateutil==2.9.0.post0
 pytz==2026.1.post1
 PyYAML==6.0.3
 questionary==2.1.1
--e git+https://github.com/Redcom94/Green-FL-Project.git@ee01e0bd1e118c308a30a30eecf75f30589f8a77#egg=quickstart_pytorch
 RapidFuzz==3.14.3
 ray==2.51.1
 referencing==0.37.0

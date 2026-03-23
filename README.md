@@ -14,6 +14,9 @@ Use Python 3.13.5
 ```bash
 pip install -r requirements.txt
 ```
+```bash
+pip install -U "flwr[simulation]"
+```
 
 ## Run the project
 

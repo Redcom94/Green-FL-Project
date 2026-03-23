@@ -11,14 +11,18 @@ PROJECT_DIR = Path(__file__).resolve().parent
 
 st.set_page_config(page_title="Green FL Platform", layout="wide")
 
+# Initialisation du session_state
 for key, default in [
     ("etape", 1),
     ("fl_process", None),
     ("selected_strategy", None),
     ("selected_dataset", None),
-    ("selected_rounds", None),
-    ("selected_epochs", None),
-    ("selected_clients", None),
+    ("selected_rounds", 100),
+    ("selected_epochs", 1),
+    ("selected_clients", 10),
+    ("selected_lr", 0.01),
+    ("selected_fraction_train", 1.0),
+    ("selected_fraction_eval", 1.0),
     ("selected_model_name", None),
     ("known_csv_files_before_run", []),
     ("current_run_csv", None),
@@ -26,22 +30,17 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-
+# --- Fonctions utilitaires ---
 def safe_value(value, unit=""):
-    if pd.isna(value):
-        return "N/A"
+    if pd.isna(value): return "N/A"
     if isinstance(value, (int, float, np.integer, np.floating)):
         return f"{value:.6f}{unit}" if abs(value) < 1 else f"{value:.3f}{unit}"
     return str(value)
 
 def get_all_emission_csvs():
     outputs_dir = PROJECT_DIR / "outputs"
-    if not outputs_dir.exists():
-        return []
+    if not outputs_dir.exists(): return []
     return sorted(outputs_dir.glob("**/emission.csv"), key=lambda p: p.stat().st_mtime)
-
-def get_latest_csv():
-    return (get_all_emission_csvs() or [None])[-1]
 
 def get_new_csv_after_run():
     known = set(str(p) for p in st.session_state.known_csv_files_before_run)
@@ -49,146 +48,99 @@ def get_new_csv_after_run():
     return new[-1] if new else None
 
 def read_csv_safely(path):
-    if path is None:
-        return None
-    try:
-        return pd.read_csv(path)
-    except Exception:
-        return None
+    if path is None: return None
+    try: return pd.read_csv(path)
+    except: return None
 
-def write_pyproject_with_config(strategy, rounds, epochs, clients, lr, clients_training, clients_evaluation, extra_opts):
+def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, extra_opts):
     path = PROJECT_DIR / "pyproject.toml"
     data = toml.load(path)
-    data["tool"]["flwr"]["app"]["config"]["strategy"] = strategy.lower()
-    data["tool"]["flwr"]["app"]["config"]["num-server-rounds"] = rounds
-    data["tool"]["flwr"]["app"]["config"]["local-epochs"] = epochs
-    data["tool"]["flwr"]["app"]["config"]["fraction-train"] = 1.0
-    data["tool"]["flwr"]["app"]["config"]["learning-rate"] = lr
-    data["tool"]["flwr"]["app"]["config"].pop("franction-train", None)
-    data["tool"]["flwr"]["app"]["config"]["num-supernodes"] = clients
-    data["tool"]["flwr"]["app"]["config"]["num-supernodes-training"] = clients_training
-    data["tool"]["flwr"]["app"]["config"]["num-supernodes-evaluation"] = clients_evaluation
-    # Injection des options dynamiques (FedProx, Adam, etc.)
+    cfg = data["tool"]["flwr"]["app"]["config"]
+    
+    # Pool de clients imposé à 10
+    NB_CLIENTS = 10
+    cfg["strategy"] = strategy.lower()
+    cfg["num-server-rounds"] = rounds
+    cfg["local-epochs"] = epochs
+    cfg["learning-rate"] = lr
+    cfg["num-supernodes"] = NB_CLIENTS
+    cfg["num-supernodes-training"] = 0
+    cfg["num-supernodes-evaluation"] = 0
+    cfg["fraction-train"] = f_train
+    cfg["fraction-evaluate"] = f_eval
+    
     for key, val in extra_opts.items():
-        data["tool"]["flwr"]["app"]["config"][key] = val
+        cfg[key] = val
+        
     with open(path, "w") as f:
         toml.dump(data, f)
 
-
 # ════════════════════════════════════════════════════════════════════
-# ÉCRAN 1  — uniquement quand etape == 1
-# Les widgets interactifs n'existent PAS dans le DOM aux étapes 2 et 3
+# ÉCRAN 1 : CONFIGURATION
 # ════════════════════════════════════════════════════════════════════
 if st.session_state.etape == 1:
-
     st.title("🌱 Green Federated Learning Platform")
-    st.markdown("### 🛠️ Étape 1 : Configuration")
+    st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
     st.divider()
 
     col_m, col_d = st.columns(2)
     with col_m:
-        st.markdown("""
-        <div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;">
-            <h4 style="margin-top:0;">🧠 Architecture</h4>
-            <p style="font-size:0.85em;color:#555;">Importez votre modèle (.py ou .pt)</p>
-        </div>""", unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py ou .pt)</p></div>', unsafe_allow_html=True)
         model_file = st.file_uploader("Fichier", type=["py", "pt"], label_visibility="collapsed")
 
     with col_d:
-        st.markdown("""
-        <div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;">
-            <h4 style="margin-top:0;">📂 Données</h4>
-            <p style="font-size:0.85em;color:#555;">Choisissez le jeu de données cible</p>
-        </div>""", unsafe_allow_html=True)
+        st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
         dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🚀 Stratégie & Hyperparamètres")
-    c_s, c_h = st.columns([1, 2])
+    st.markdown("#### 🚀 Hyperparamètres de base")
+    c_s, c_r, c_e, c_l = st.columns(4)
     with c_s:
-        strategie = st.selectbox("Choix Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
-    with c_h:
-        rounds = st.slider("Rounds", 1, 200, 100)
-        e_col, c_col, lr_col = st.columns(3)
-        with e_col:
-            epochs = st.select_slider("Epochs locales", options=[1, 2, 3])
-        with c_col:
-            clients = st.number_input("Clients", min_value=1, value=10, step=1)
-        with lr_col:
-            lr = st.number_input("Learning Rate", min_value=0.0001, max_value=1.0, value=0.01, format="%.4f", step=0.001)
-        with st.expander("Options avancées"):
-            ct_col, ce_col = st.columns(2)
-            with ct_col:
-                clients_training = st.number_input("Clients d'entraînement", min_value=1, value=8, step=1)
-            with ce_col:
-                clients_evaluation = st.number_input("Clients d'évaluation", min_value=1, value=5, step=1)
-            st.divider()
-            st.markdown("**Proportions de sélection**")
-            f_col1, f_col2 = st.columns(2)
-            with f_col1:
-                frac_train = st.slider("Fraction entraînement", 0.1, 1.0, 1.0, help="Pourcentage de clients actifs par round d'entraînement")
-            with f_col2:
-                frac_eval = st.slider("Fraction évaluation", 0.1, 1.0, 1.0, help="Pourcentage de clients actifs par round de validation")
-            # --- Nouveaux paramètres dynamiques ---
+        strategie = st.selectbox("Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
+    with c_r:
+        rounds = st.number_input("Rounds", min_value=1, value=100)
+    with c_e:
+        epochs = st.selectbox("Epochs locales", [1, 2, 3])
+    with c_l:
+        lr = st.number_input("Learning Rate", min_value=0.0001, value=0.01, format="%.4f")
+
+    st.markdown("#### ⚖️ Sélection des clients")
+    f_train_col, f_eval_col = st.columns(2)
+    with f_train_col:
+        frac_train = st.slider("Fraction Entraînement", 0.1, 1.0, 1.0, help="Part des 10 clients tirés pour l'entraînement")
+    with f_eval_col:
+        frac_eval = st.slider("Fraction Évaluation", 0.1, 1.0, 1.0, help="Part des 10 clients tirés pour la validation")
+
+    extra_opts = {}
+    if strategie in ["FedProx", "FedAdam", "FedYogi", "FedAdagrad"]:
+        with st.expander(f"Options spécifiques à {strategie}"):
             if strategie == "FedProx":
-                proximal_mu = st.slider("Proximal Mu (μ)", 0.0, 1.0, 0.1)
-            elif strategie in ["FedAdam", "FedYogi"]:
+                extra_opts["proximal-mu"] = st.slider("Proximal Mu (μ)", 0.0, 1.0, 0.1)
+            else:
                 c1, c2 = st.columns(2)
-                server_lr = c1.number_input("Server LR (eta)", value=1.0, step=0.1)
-                tau = c2.number_input("Tau (stabilité)", value=1e-9, format="%.1e")
-                b1, b2 = st.columns(2)
-                beta_1 = b1.slider("Beta 1", 0.0, 1.0, 0.9)
-                beta_2 = b2.slider("Beta 2", 0.0, 1.0, 0.99)
-            elif strategie == "FedAdagrad":
-                c1, c2 = st.columns(2)
-                server_lr = c1.number_input("Server LR (eta)", value=1.0, step=0.1)
-                tau = c2.number_input("Tau (stabilité)", value=1e-9, format="%.1e")
+                extra_opts["server-learning-rate"] = c1.number_input("Server LR", value=1.0)
+                extra_opts["tau"] = c2.number_input("Tau", value=1e-9, format="%.1e")
+                if strategie != "FedAdagrad":
+                    extra_opts["beta-1"] = st.slider("Beta 1", 0.0, 1.0, 0.9)
+                    extra_opts["beta-2"] = st.slider("Beta 2", 0.0, 1.0, 0.99)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("Configuration sélectionnée")
-    r1, r2, r3, r4, r5, r6, r7 = st.columns(7)
-    r1.metric("Stratégie", strategie)
-    r2.metric("Dataset", dataset)
-    r3.metric("Rounds", int(rounds))
-    r4.metric("Epochs", int(epochs))
-    r5.metric("Clients", int(clients))
-    r6.metric("Clients d'entraînement", int(clients_training))
-    r7.metric("Clients d'évaluation", int(clients_evaluation))
-
-    model_name = model_file.name if model_file else "Aucun fichier importé"
-    st.caption(f"Modèle sélectionné : {model_name}")
-
-    if st.button("🚀 LANCER L'EXPÉRIENCE", use_container_width=True, type="primary"):  #BUG ICI, RESTE AFFICHE PENDANT L'ETAPE 2
-        st.session_state.selected_lr = float(lr)
+    if st.button("🚀 LANCER L'EXPÉRIENCE", use_container_width=True, type="primary"):
         st.session_state.selected_strategy = strategie
         st.session_state.selected_dataset = dataset
-        st.session_state.selected_rounds = int(rounds)
-        st.session_state.selected_epochs = int(epochs)
-        st.session_state.selected_clients = int(clients)
-        st.session_state.selected_clients_training = int(clients_training)
-        st.session_state.selected_clients_evaluation = int(clients_evaluation)
-        st.session_state.selected_model_name = model_name
+        st.session_state.selected_rounds = rounds
+        st.session_state.selected_epochs = epochs
+        st.session_state.selected_lr = lr
+        st.session_state.selected_fraction_train = frac_train
+        st.session_state.selected_fraction_eval = frac_eval
+        st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
         st.session_state.known_csv_files_before_run = get_all_emission_csvs()
-        st.session_state.current_run_csv = None
-        # Préparer les options spécifiques
-        extra_opts = {}
-        extra_opts["fraction-train"] = frac_train
-        extra_opts["fraction-evaluate"] = frac_eval
-        if strategie == "FedProx":
-            extra_opts["proximal-mu"] = proximal_mu
-        elif strategie in ["FedAdam", "FedYogi", "FedAdagrad"]:
-            extra_opts["server-learning-rate"] = server_lr
-            extra_opts["tau"] = tau
-            if strategie != "FedAdagrad":
-                extra_opts["beta-1"] = beta_1
-                extra_opts["beta-2"] = beta_2
-        write_pyproject_with_config(strategie, int(rounds), int(epochs), int(clients), lr, int(clients_training), int(clients_evaluation),  extra_opts)
+        
+        write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, extra_opts)
+        
         env = os.environ.copy()
         env["WANDB_MODE"] = "offline"
         st.session_state.fl_process = subprocess.Popen(["flwr", "run", "."], cwd=PROJECT_DIR, env=env)
         st.session_state.etape = 2
         st.rerun()
-
 
 # ════════════════════════════════════════════════════════════════════
 # ÉCRAN 2
@@ -356,5 +308,4 @@ elif st.session_state.etape == 3:
         st.session_state.etape = 1
         st.session_state.current_run_csv = None
         st.session_state.fl_process = None
-        st.rerun()
-
+        st.rerun

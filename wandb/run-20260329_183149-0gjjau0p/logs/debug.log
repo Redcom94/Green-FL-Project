@@ -1,0 +1,13 @@
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_setup.py:_flush():81] Current SDK version is 0.25.1
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_setup.py:_flush():81] Configure stats pid to 3338
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:setup_run_log_directory():717] Logging user logs to /home/ludovic/quickstart-pytorch/wandb/run-20260329_183149-0gjjau0p/logs/debug.log
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to /home/ludovic/quickstart-pytorch/wandb/run-20260329_183149-0gjjau0p/logs/debug-internal.log
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():844] calling init triggers
+2026-03-29 18:31:49,698 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'_wandb': {}}
+2026-03-29 18:31:49,699 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():892] starting backend
+2026-03-29 18:31:49,918 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():895] sending inform_init request
+2026-03-29 18:31:49,921 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():903] backend started and connected
+2026-03-29 18:31:49,923 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():973] updated telemetry
+2026-03-29 18:31:49,928 INFO    Thread-1 (server_th_with_start_checks):3338 [wandb_init.py:init():997] communicating run to backend with 90.0 second timeout

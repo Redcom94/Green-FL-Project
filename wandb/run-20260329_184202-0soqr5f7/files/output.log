@@ -1,0 +1,479 @@
+[92mINFO [0m:      Starting CustomFedAvg strategy:
+[92mINFO [0m:      	├── Number of rounds: 10
+[92mINFO [0m:      	├── ArrayRecord (0.24 MB)
+[92mINFO [0m:      	├── ConfigRecord (train): {'lr': 0.01}
+[92mINFO [0m:      	├── ConfigRecord (evaluate): (empty!)
+[92mINFO [0m:      	├──> Sampling:
+[92mINFO [0m:      	│	├──Fraction: train (0.80) | evaluate ( 0.50)
+[92mINFO [0m:      	│	├──Minimum nodes: train (8) | evaluate (5)
+[92mINFO [0m:      	│	└──Minimum available nodes: 10
+[92mINFO [0m:      	└──> Keys in records:
+[92mINFO [0m:      		├── Weighted by: 'num-examples'
+[92mINFO [0m:      		├── ArrayRecord key: 'arrays'
+[92mINFO [0m:      		└── ConfigRecord key: 'config'
+[92mINFO [0m:
+[92mINFO [0m:      Initial global evaluation results: {'accuracy': 0.3165, 'loss': 1.8984221386004099}
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 1/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 8.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 66.2% (5.06 GB)
+[36m(ClientAppActor pid=9256)[0m Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 5.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.0% (5.96 GB)
+[codecarbon INFO @ 18:42:19] Energy consumed for RAM : 0.000044 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:42:19] Delta energy consumed for CPU with cpu_load : 0.000022 kWh, power : 5.033925456960001 W
+[codecarbon INFO @ 18:42:19] Energy consumed for All CPU : 0.000022 kWh
+[codecarbon INFO @ 18:42:19] Monitoring GPUs with indices: [0] out of 1 total GPUs
+[codecarbon INFO @ 18:42:19] Energy consumed for all GPUs : 0.000127 kWh. Total GPU Power : 27.5851136603302 W
+[codecarbon INFO @ 18:42:19] 0.000193 kWh of electricity and 0.000000 L of water were used since the beginning.
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 7.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.4% (5.99 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 5.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.4% (5.99 GB)
+[36m(pid=gcs_server)[0m [2026-03-29 18:42:25,056 E 7614 7614] (gcs_server) gcs_server.cc:302: Failed to establish connection to the event+metrics exporter agent. Events and metrics will not be exported. Exporter agent status: RpcError: Running out of retries to initialize the metrics agent. rpc_code: 14
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 5.9
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.8% (6.02 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 6.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.8% (6.02 GB)
+[33m(raylet)[0m [2026-03-29 18:42:26,982 E 7872 7872] (raylet) main.cc:975: Failed to establish connection to the metrics exporter agent. Metrics will not be exported. Exporter agent status: RpcError: Running out of retries to initialize the metrics agent. rpc_code: 14
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.8% (6.03 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 78.9% (6.03 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.9763770400564435}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[36m(pid=7990)[0m [2026-03-29 18:42:29,957 E 7990 8346] core_worker_process.cc:825: Failed to establish connection to the metrics exporter agent. Metrics will not be exported. Exporter agent status: RpcError: Running out of retries to initialize the metrics agent. rpc_code: 14
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 2.1413190085247082, 'eval_acc': 0.16450011817537225}
+[92mINFO [0m:      Global evaluation
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3129, 'loss': 1.8795660040046596}
+[92mINFO [0m:      💡 New best global model found: 0.312900
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 2/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.4% (6.14 GB)
+[codecarbon INFO @ 18:42:34] Energy consumed for RAM : 0.000085 kWh. RAM Power : 10.0 W
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.4% (6.14 GB)
+[codecarbon INFO @ 18:42:34] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.063549211300001 W
+[codecarbon INFO @ 18:42:34] Energy consumed for All CPU : 0.000043 kWh
+[codecarbon INFO @ 18:42:34] Energy consumed for all GPUs : 0.000212 kWh. Total GPU Power : 20.460920791359747 W
+[codecarbon INFO @ 18:42:34] 0.000339 kWh of electricity and 0.000000 L of water were used since the beginning.
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.4% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.4% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.4% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.8825787143774138}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 2.052436306027385, 'eval_acc': 0.19333799208013044}
+[92mINFO [0m:      Global evaluation
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3046, 'loss': 1.8568605712697477}
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 3/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 1.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[codecarbon INFO @ 18:42:52] Energy consumed for RAM : 0.000125 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:42:52] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.0348365986 W
+[codecarbon INFO @ 18:42:52] Energy consumed for All CPU : 0.000063 kWh
+[codecarbon INFO @ 18:42:52] Energy consumed for all GPUs : 0.000297 kWh. Total GPU Power : 20.363006236147825 W
+[codecarbon INFO @ 18:42:52] 0.000485 kWh of electricity and 0.000000 L of water were used since the beginning.
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 5.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 5.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 2.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.15 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.4
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.5% (6.16 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7921956710029642}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 1.9932163835248433, 'eval_acc': 0.2758959253804615}
+[92mINFO [0m:      Global evaluation
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3181, 'loss': 1.8182279218601276}
+[92mINFO [0m:      💡 New best global model found: 0.318100
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 4/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 18.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[codecarbon INFO @ 18:43:07] Energy consumed for RAM : 0.000165 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:43:07] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.042499209400001 W
+[codecarbon INFO @ 18:43:07] Energy consumed for All CPU : 0.000083 kWh
+[codecarbon INFO @ 18:43:07] Energy consumed for all GPUs : 0.000386 kWh. Total GPU Power : 21.50049883238261 W
+[codecarbon INFO @ 18:43:07] 0.000635 kWh of electricity and 0.000000 L of water were used since the beginning.
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7730566943111792}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 1.664227333883661, 'eval_acc': 0.4088050314465409}
+[92mINFO [0m:      Global evaluation
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3255, 'loss': 1.8601350769211975}
+[92mINFO [0m:      💡 New best global model found: 0.325500
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 5/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[codecarbon INFO @ 18:43:22] Energy consumed for RAM : 0.000206 kWh. RAM Power : 10.0 W
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[codecarbon INFO @ 18:43:22] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.051747989200001 W
+[codecarbon INFO @ 18:43:22] Energy consumed for All CPU : 0.000104 kWh
+[codecarbon INFO @ 18:43:22] Energy consumed for all GPUs : 0.000474 kWh. Total GPU Power : 21.145871784455817 W
+[codecarbon INFO @ 18:43:22] 0.000783 kWh of electricity and 0.000000 L of water were used since the beginning.
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 7.4
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 17.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 2.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.6% (6.16 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7367718173777971}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 2.0080729890072666, 'eval_acc': 0.22489217498459643}
+[92mINFO [0m:      Global evaluation
+[codecarbon INFO @ 18:43:40] Energy consumed for RAM : 0.000246 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:43:41] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.056068904500001 W
+[codecarbon INFO @ 18:43:41] Energy consumed for All CPU : 0.000124 kWh
+[codecarbon INFO @ 18:43:41] Energy consumed for all GPUs : 0.000552 kWh. Total GPU Power : 18.68868374338193 W
+[codecarbon INFO @ 18:43:41] 0.000922 kWh of electricity and 0.000000 L of water were used since the beginning.
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3399, 'loss': 1.7753637516045873}
+[92mINFO [0m:      💡 New best global model found: 0.339900
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 6/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.16 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 14.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 14.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 1.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 7.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7503924223853986}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 2.2001948068759725, 'eval_acc': 0.24523990860624523}
+[92mINFO [0m:      Global evaluation
+[codecarbon INFO @ 18:43:55] Energy consumed for RAM : 0.000286 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:43:56] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.0680037172 W
+[codecarbon INFO @ 18:43:56] Energy consumed for All CPU : 0.000144 kWh
+[codecarbon INFO @ 18:43:56] Energy consumed for all GPUs : 0.000621 kWh. Total GPU Power : 16.411411891682715 W
+[codecarbon INFO @ 18:43:56] 0.001051 kWh of electricity and 0.000000 L of water were used since the beginning.
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3455, 'loss': 1.898716233953645}
+[92mINFO [0m:      💡 New best global model found: 0.345500
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 7/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 8.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 14.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.9
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7999315334031551}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 2.038903853390769, 'eval_acc': 0.2742890995260663}
+[92mINFO [0m:      Global evaluation
+[codecarbon INFO @ 18:44:14] Energy consumed for RAM : 0.000326 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:44:14] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.054738808900001 W
+[codecarbon INFO @ 18:44:14] Energy consumed for All CPU : 0.000165 kWh
+[codecarbon INFO @ 18:44:14] Energy consumed for all GPUs : 0.000683 kWh. Total GPU Power : 15.074884560722326 W
+[codecarbon INFO @ 18:44:14] 0.001174 kWh of electricity and 0.000000 L of water were used since the beginning.
+[codecarbon INFO @ 18:44:14] 0.001335 g.CO2eq/s mean an estimation of 42.09198469200992 kg.CO2eq/year
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3341, 'loss': 1.872340600701827}
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 8/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 6.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 15.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 13.7
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.6874342467748488}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 1.5682164224642117, 'eval_acc': 0.41190557646253845}
+[92mINFO [0m:      Global evaluation
+[codecarbon INFO @ 18:44:29] Energy consumed for RAM : 0.000367 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:44:29] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.0527325496 W
+[codecarbon INFO @ 18:44:29] Energy consumed for All CPU : 0.000185 kWh
+[codecarbon INFO @ 18:44:29] Energy consumed for all GPUs : 0.000765 kWh. Total GPU Power : 19.625551816067173 W
+[codecarbon INFO @ 18:44:29] 0.001317 kWh of electricity and 0.000000 L of water were used since the beginning.
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3538, 'loss': 1.7598371234121202}
+[92mINFO [0m:      💡 New best global model found: 0.353800
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 9/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 14.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client1]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 13.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 8.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client8]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 0.8
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7097608123399769}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[codecarbon INFO @ 18:44:47] Energy consumed for RAM : 0.000407 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:44:47] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.049582708000001 W
+[codecarbon INFO @ 18:44:47] Energy consumed for All CPU : 0.000205 kWh
+[codecarbon INFO @ 18:44:47] Energy consumed for all GPUs : 0.000852 kWh. Total GPU Power : 20.872618793498386 W
+[codecarbon INFO @ 18:44:47] 0.001464 kWh of electricity and 0.000000 L of water were used since the beginning.
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 1.5825874090019247, 'eval_acc': 0.4432296047098403}
+[92mINFO [0m:      Global evaluation
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3633, 'loss': 1.7579776516443566}
+[92mINFO [0m:      💡 New best global model found: 0.363300
+[92mINFO [0m:
+[92mINFO [0m:      [ROUND 10/10]
+[92mINFO [0m:      configure_train: Sampled 8 nodes (out of 10)
+[36m(ClientAppActor pid=9256)[0m [monitoring client0]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 12.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client2]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 11.6
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client3]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 2.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.7% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client4]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 10.0
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client5]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 8.5
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client6]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 9.2
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client7]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 13.1
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[36m(ClientAppActor pid=9256)[0m [monitoring client9]
+[36m(ClientAppActor pid=9256)[0m charge de cpu est : 4.3
+[36m(ClientAppActor pid=9256)[0m La RMA utilisée  : 80.8% (6.17 GB)
+[92mINFO [0m:      aggregate_train: Received 8 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'train_loss': 0.7121740176732662}
+[92mINFO [0m:      configure_evaluate: Sampled 5 nodes (out of 10)
+[92mINFO [0m:      aggregate_evaluate: Received 5 results and 0 failures
+[92mINFO [0m:      	└──> Aggregated MetricRecord: {'eval_loss': 1.617110799888916, 'eval_acc': 0.33202185792349725}
+[92mINFO [0m:      Global evaluation
+[codecarbon INFO @ 18:45:02] Energy consumed for RAM : 0.000447 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:45:02] Delta energy consumed for CPU with cpu_load : 0.000020 kWh, power : 5.058583217400001 W
+[codecarbon INFO @ 18:45:02] Energy consumed for All CPU : 0.000226 kWh
+[codecarbon INFO @ 18:45:02] Energy consumed for all GPUs : 0.000937 kWh. Total GPU Power : 20.303136592241252 W
+[codecarbon INFO @ 18:45:02] 0.001610 kWh of electricity and 0.000000 L of water were used since the beginning.
+[92mINFO [0m:      	└──> MetricRecord: {'accuracy': 0.3474, 'loss': 1.7200892695897743}
+[92mINFO [0m:
+[92mINFO [0m:      Strategy execution finished in 180.46s
+[92mINFO [0m:
+[92mINFO [0m:      Final results:
+[92mINFO [0m:
+[92mINFO [0m:      	Global Arrays:
+[92mINFO [0m:      		ArrayRecord (0.238 MB)
+[92mINFO [0m:      	
+[92mINFO [0m:      	Aggregated ClientApp-side Train Metrics:
+[92mINFO [0m:      	{ 1: {'train_loss': '9.7638e-01'},
+[92mINFO [0m:      	  2: {'train_loss': '8.8258e-01'},
+[92mINFO [0m:      	  3: {'train_loss': '7.9220e-01'},
+[92mINFO [0m:      	  4: {'train_loss': '7.7306e-01'},
+[92mINFO [0m:      	  5: {'train_loss': '7.3677e-01'},
+[92mINFO [0m:      	  6: {'train_loss': '7.5039e-01'},
+[92mINFO [0m:      	  7: {'train_loss': '7.9993e-01'},
+[92mINFO [0m:      	  8: {'train_loss': '6.8743e-01'},
+[92mINFO [0m:      	  9: {'train_loss': '7.0976e-01'},
+[92mINFO [0m:      	  10: {'train_loss': '7.1217e-01'}}
+[92mINFO [0m:      	
+[92mINFO [0m:      	Aggregated ClientApp-side Evaluate Metrics:
+[92mINFO [0m:      	{ 1: {'eval_acc': '1.6450e-01', 'eval_loss': '2.1413e+00'},
+[92mINFO [0m:      	  2: {'eval_acc': '1.9334e-01', 'eval_loss': '2.0524e+00'},
+[92mINFO [0m:      	  3: {'eval_acc': '2.7590e-01', 'eval_loss': '1.9932e+00'},
+[92mINFO [0m:      	  4: {'eval_acc': '4.0881e-01', 'eval_loss': '1.6642e+00'},
+[92mINFO [0m:      	  5: {'eval_acc': '2.2489e-01', 'eval_loss': '2.0081e+00'},
+[92mINFO [0m:      	  6: {'eval_acc': '2.4524e-01', 'eval_loss': '2.2002e+00'},
+[92mINFO [0m:      	  7: {'eval_acc': '2.7429e-01', 'eval_loss': '2.0389e+00'},
+[92mINFO [0m:      	  8: {'eval_acc': '4.1191e-01', 'eval_loss': '1.5682e+00'},
+[92mINFO [0m:      	  9: {'eval_acc': '4.4323e-01', 'eval_loss': '1.5826e+00'},
+[92mINFO [0m:      	  10: {'eval_acc': '3.3202e-01', 'eval_loss': '1.6171e+00'}}
+[92mINFO [0m:      	
+[92mINFO [0m:      	ServerApp-side Evaluate Metrics:
+[92mINFO [0m:      	{ 0: {'accuracy': '3.1650e-01', 'loss': '1.8984e+00'},
+[92mINFO [0m:      	  1: {'accuracy': '3.1290e-01', 'loss': '1.8796e+00'},
+[92mINFO [0m:      	  2: {'accuracy': '3.0460e-01', 'loss': '1.8569e+00'},
+[92mINFO [0m:      	  3: {'accuracy': '3.1810e-01', 'loss': '1.8182e+00'},
+[92mINFO [0m:      	  4: {'accuracy': '3.2550e-01', 'loss': '1.8601e+00'},
+[92mINFO [0m:      	  5: {'accuracy': '3.3990e-01', 'loss': '1.7754e+00'},
+[92mINFO [0m:      	  6: {'accuracy': '3.4550e-01', 'loss': '1.8987e+00'},
+[92mINFO [0m:      	  7: {'accuracy': '3.3410e-01', 'loss': '1.8723e+00'},
+[92mINFO [0m:      	  8: {'accuracy': '3.5380e-01', 'loss': '1.7598e+00'},
+[92mINFO [0m:      	  9: {'accuracy': '3.6330e-01', 'loss': '1.7580e+00'},
+[92mINFO [0m:      	  10: {'accuracy': '3.4740e-01', 'loss': '1.7201e+00'}}
+[92mINFO [0m:
+[codecarbon INFO @ 18:45:03] Energy consumed for RAM : 0.000450 kWh. RAM Power : 10.0 W
+[codecarbon INFO @ 18:45:04] Delta energy consumed for CPU with cpu_load : 0.000002 kWh, power : 5.158758590400001 W
+[codecarbon INFO @ 18:45:04] Energy consumed for All CPU : 0.000228 kWh
+[codecarbon INFO @ 18:45:04] Energy consumed for all GPUs : 0.000945 kWh. Total GPU Power : 18.493305278432427 W
+[codecarbon INFO @ 18:45:04] 0.001623 kWh of electricity and 0.000000 L of water were used since the beginning.
+Carbon emissions recorded in /home/ludovic/quickstart-pytorch/outputs/2026-03-29/18-41-52/emission.csv
+
+💾 Saving final model to disk...
+[36m(ClientAppActor pid=9256)[0m [93mWARNING [0m:   Manually terminating ClientAppActor
+[36m(ClientAppActor pid=9256)[0m [2026-03-29 18:42:31,983 E 9256 9310] core_worker_process.cc:825: Failed to establish connection to the metrics exporter agent. Metrics will not be exported. Exporter agent status: RpcError: Running out of retries to initialize the metrics agent. rpc_code: 14[32m [repeated 10x across cluster] (Ray deduplicates logs by default. Set RAY_DEDUP_LOGS=0 to disable log deduplication, or see https://docs.ray.io/en/master/ray-observability/user-guides/configure-logging.html#log-deduplication for more options.)[0m

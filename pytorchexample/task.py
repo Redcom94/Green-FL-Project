@@ -23,7 +23,7 @@ def apply_transforms(batch):
     return batch
 
 
-def load_data(partition_id: int, num_partitions: int, batch_size: int):
+def load_data(partition_id: int, num_partitions: int, batch_size: int, alpha: float = 0.1, self_balancing: bool = True):
     """Load partition CIFAR10 data."""
     # Only initialize `FederatedDataset` once
     global fds
@@ -31,7 +31,8 @@ def load_data(partition_id: int, num_partitions: int, batch_size: int):
         partitioner = DirichletPartitioner(
             num_partitions=num_partitions, 
             partition_by="label",
-            alpha=0.1, # Plus alpha est petit (ex: 0.1), plus c'est hétérogène
+            alpha= alpha, # Plus alpha est petit (ex: 0.1), plus c'est hétérogène
+            self_balancing= self_balancing
         )
         fds = FederatedDataset(
             dataset="uoft-cs/cifar10",

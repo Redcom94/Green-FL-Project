@@ -32,7 +32,9 @@ def train(msg: Message, context: Context):
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
-    trainloader, _ = load_data(partition_id, num_partitions, batch_size)
+    alpha = context.run_config.get("alpha", 0.1)  # Récupérer alpha depuis la configuration, avec une valeur par défaut
+    self_balancing = context.run_config.get("self_balancing", True)  # Récupérer self_balancing depuis la configuration, avec une valeur par défaut
+    trainloader, _ = load_data(partition_id, num_partitions, batch_size, alpha, self_balancing)
 
     # Call the training function
     train_loss = train_fn(

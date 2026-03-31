@@ -24,6 +24,8 @@ for key, default in [
     ("selected_fraction_train", 1.0),
     ("selected_fraction_eval", 1.0),
     ("selected_model_name", None),
+    ("selected_alpha", 0.1),
+    ("selected_self_balancing", True),
     ("known_csv_files_before_run", []),
     ("current_run_csv", None),
 ]:
@@ -36,6 +38,11 @@ def safe_value(value, unit=""):
     if isinstance(value, (int, float, np.integer, np.floating)):
         return f"{value:.6f}{unit}" if abs(value) < 1 else f"{value:.3f}{unit}"
     return str(value)
+
+def get_latest_csv():
+    """Récupère le chemin du tout dernier fichier emission.csv créé dans le dossier outputs."""
+    csvs = get_all_emission_csvs()
+    return csvs[-1] if csvs else None
 
 def get_all_emission_csvs():
     outputs_dir = PROJECT_DIR / "outputs"
@@ -52,95 +59,164 @@ def read_csv_safely(path):
     try: return pd.read_csv(path)
     except: return None
 
-def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, extra_opts):
-    path = PROJECT_DIR / "pyproject.toml"
-    data = toml.load(path)
-    cfg = data["tool"]["flwr"]["app"]["config"]
+def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing):
+    # --- 1. Mise à jour de pyproject.toml ---
+    pyproject_path = PROJECT_DIR / "pyproject.toml"
+    pyproject_data = toml.load(pyproject_path)
+    cfg = pyproject_data["tool"]["flwr"]["app"]["config"]
     
-    # Pool de clients imposé à 10
-    NB_CLIENTS = 10
     cfg["strategy"] = strategy.lower()
     cfg["num-server-rounds"] = rounds
     cfg["local-epochs"] = epochs
     cfg["learning-rate"] = lr
-    cfg["num-supernodes"] = NB_CLIENTS
-    cfg["num-supernodes-training"] = 0
-    cfg["num-supernodes-evaluation"] = 0
+    cfg["num-supernodes"] = num_clients
+    cfg["num-supernodes-training"] = max(1, int(num_clients * f_train))
+    cfg["num-supernodes-evaluation"] = max(1, int(num_clients * f_eval))
     cfg["fraction-train"] = f_train
     cfg["fraction-evaluate"] = f_eval
-    
+    cfg["alpha"] = alpha
+    cfg["self-balancing"] = self_balancing
+
     for key, val in extra_opts.items():
         cfg[key] = val
         
-    with open(path, "w") as f:
-        toml.dump(data, f)
+    with open(pyproject_path, "w") as f:
+        toml.dump(pyproject_data, f)
 
+    # --- 2. Mise à jour de C:\Users\darks\.flwr\config.toml ---
+    flwr_global_config = Path.home() / ".flwr" / "config.toml"
+    
+    if flwr_global_config.exists():
+        try:
+            data_global = toml.load(flwr_global_config)
+            
+            # On accède à la structure que vous avez vue
+            # superlink -> local -> options -> num_supernodes
+            if "superlink" in data_global and "local" in data_global["superlink"]:
+                local_section = data_global["superlink"]["local"]
+                
+                # On met à jour le nombre de clients simulés
+                if "options" not in local_section:
+                    local_section["options"] = {}
+                local_section["options"]["num-supernodes"] = num_clients
+                
+                # SÉCURITÉ : On retire le run_id s'il existe pour éviter le conflit SuperLink
+                # .pop(key, None) ne génère pas d'erreur si la clé est absente
+                local_section.pop("run_id", None)
+                
+                with open(flwr_global_config, "w") as f:
+                    toml.dump(data_global, f)
+                    
+        except Exception as e:
+            # Si le fichier est verrouillé ou corrompu, on l'efface. 
+            # Flower le recréera proprement au lancement.
+            st.warning(f"Note : Reset du cache Flower suite à une erreur de lecture.")
+            flwr_global_config.unlink()
 # ════════════════════════════════════════════════════════════════════
 # ÉCRAN 1 : CONFIGURATION
 # ════════════════════════════════════════════════════════════════════
 if st.session_state.etape == 1:
-    st.title("🌱 Green Federated Learning Platform")
-    st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
-    st.divider()
+    with st.container():
+        st.title("🌱 Green Federated Learning Platform")
+        st.markdown("### 🛠️ Étape 1 : Configuration ")
+        st.divider()
 
-    col_m, col_d = st.columns(2)
-    with col_m:
-        st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py ou .pt)</p></div>', unsafe_allow_html=True)
-        model_file = st.file_uploader("Fichier", type=["py", "pt"], label_visibility="collapsed")
+        col_m, col_d = st.columns(2)
+        with col_m:
+            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py ou .pt)</p></div>', unsafe_allow_html=True)
+            model_file = st.file_uploader("Fichier", type=["py", "pt"], label_visibility="collapsed")
 
-    with col_d:
-        st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
-        dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")
+        with col_d:
+            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
+            dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")
 
-    st.markdown("#### 🚀 Hyperparamètres de base")
-    c_s, c_r, c_e, c_l = st.columns(4)
-    with c_s:
-        strategie = st.selectbox("Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
-    with c_r:
-        rounds = st.number_input("Rounds", min_value=1, value=100)
-    with c_e:
-        epochs = st.selectbox("Epochs locales", [1, 2, 3])
-    with c_l:
-        lr = st.number_input("Learning Rate", min_value=0.0001, value=0.01, format="%.4f")
+        st.markdown("#### 🚀 Hyperparamètres de base")
+        c_s, c_r, c_e, c_l = st.columns(4)
+        with c_s:
+            strategie = st.selectbox("Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
+        with c_r:
+            rounds = st.number_input("Rounds", min_value=1, value=1)
+        with c_e:
+            epochs = st.selectbox("Epochs locales", [1, 2, 3])
+        with c_l:
+            lr = st.number_input("Learning Rate", min_value=0.0001, value=0.01, format="%.4f")
 
-    st.markdown("#### ⚖️ Sélection des clients")
-    f_train_col, f_eval_col = st.columns(2)
-    with f_train_col:
-        frac_train = st.slider("Fraction Entraînement", 0.1, 1.0, 1.0, help="Part des 10 clients tirés pour l'entraînement")
-    with f_eval_col:
-        frac_eval = st.slider("Fraction Évaluation", 0.1, 1.0, 1.0, help="Part des 10 clients tirés pour la validation")
-
-    extra_opts = {}
-    if strategie in ["FedProx", "FedAdam", "FedYogi", "FedAdagrad"]:
-        with st.expander(f"Options spécifiques à {strategie}"):
-            if strategie == "FedProx":
-                extra_opts["proximal-mu"] = st.slider("Proximal Mu (μ)", 0.0, 1.0, 0.1)
-            else:
+        st.markdown("#### ⚖️ Sélection des clients")
+        clients_number = st.slider("Nombre de clients", 2, 100, st.session_state.selected_clients, help="Nombre de clients")
+        default_train = min(8, clients_number)
+        default_eval = min(5, clients_number)
+        f_train_col, f_eval_col = st.columns(2)
+        with f_train_col:
+            clients_train = st.slider("Entraînement", 1, max(clients_number, 1), default_train, help="Clients tirés pour l'entraînement")
+            frac_train = clients_train / clients_number if clients_number > 0 else 0
+        with f_eval_col:
+            clients_eval = st.slider("Évaluation", 1, max(clients_number, 1), default_eval, help="Part des clients tirés pour la validation")
+            frac_eval = clients_eval / clients_number if clients_number > 0 else 0
+        extra_opts = {}
+        if strategie in ["FedProx", "FedAdam", "FedYogi", "FedAdagrad"]:
+            st.markdown("#### ⚙️ Options spécifiques")
+            with st.expander(f"Options spécifiques à {strategie}"):
+                if strategie == "FedProx":
+                    extra_opts["proximal-mu"] = st.slider("Proximal Mu (μ)", 0.0, 1.0, 0.1)
+                else:
+                    c1, c2 = st.columns(2)
+                    extra_opts["server-learning-rate"] = c1.number_input("Server LR", value=1.0)
+                    extra_opts["tau"] = c2.number_input("Tau", value=1e-9, format="%.1e")
+                    if strategie != "FedAdagrad":
+                        extra_opts["beta-1"] = st.slider("Beta 1", 0.0, 1.0, 0.9)
+                        extra_opts["beta-2"] = st.slider("Beta 2", 0.0, 1.0, 0.99)
+        st.markdown("#### Options de partitionnement (Dirichlet)")
+        alpha = st.slider("Alpha", 0.0, 1.0, 0.1, help="Plus alpha est petit, plus les données sont hétérogènes entre les clients. Avec alpha proche de 0, chaque client aura principalement des exemples d'une seule classe. Avec alpha élevé (ex: 1.0), les données seront plus équilibrées entre les clients. Ceci permet de simuler un label skew.")
+        self_balancing = st.checkbox("Équilibrage automatique", value=True, help="Activez cette option pour que chaque client ait une quantité de données similaire, même avec un alpha faible. Le partitionnement restera hétérogène en termes de classes, mais la taille des partitions sera plus équilibrée.")
+        st.markdown("#### Options wandb (facultatif)")
+        wandb_mode = "disabled" # Valeurs par défaut pour éviter les erreurs si l'utilisateur ne remplit pas ces champs
+        wandb_project = ""
+        wandb_api_key = ""
+        wandb_entity = ""
+        with st.expander("Options de tracking (wandb)"):
+            wandb_mode = st.selectbox("Mode de synchronisation", ["disabled", "online"])
+            if wandb_mode == "online":
                 c1, c2 = st.columns(2)
-                extra_opts["server-learning-rate"] = c1.number_input("Server LR", value=1.0)
-                extra_opts["tau"] = c2.number_input("Tau", value=1e-9, format="%.1e")
-                if strategie != "FedAdagrad":
-                    extra_opts["beta-1"] = st.slider("Beta 1", 0.0, 1.0, 0.9)
-                    extra_opts["beta-2"] = st.slider("Beta 2", 0.0, 1.0, 0.99)
+                wandb_api_key = c1.text_input("Clé API W&B", type="password", help="Trouvez votre clé sur wandb.ai/authorize")
+                wandb_project = c2.text_input("Nom du Projet", value="FLOWER-advanced-pytorch")
+                
+                wandb_entity = st.text_input("Entité (Équipe ou Utilisateur)", help="Laissez vide pour votre compte personnel")
+                
 
-    if st.button("🚀 LANCER L'EXPÉRIENCE", use_container_width=True, type="primary"):
-        st.session_state.selected_strategy = strategie
-        st.session_state.selected_dataset = dataset
-        st.session_state.selected_rounds = rounds
-        st.session_state.selected_epochs = epochs
-        st.session_state.selected_lr = lr
-        st.session_state.selected_fraction_train = frac_train
-        st.session_state.selected_fraction_eval = frac_eval
-        st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
-        st.session_state.known_csv_files_before_run = get_all_emission_csvs()
-        
-        write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, extra_opts)
-        
-        env = os.environ.copy()
-        env["WANDB_MODE"] = "offline"
-        st.session_state.fl_process = subprocess.Popen(["flwr", "run", "."], cwd=PROJECT_DIR, env=env)
-        st.session_state.etape = 2
-        st.rerun()
+        if st.button("🚀 LANCER L'EXPÉRIENCE", width="stretch", type="primary"):
+            st.session_state.selected_strategy = strategie
+            st.session_state.selected_clients = clients_number
+            st.session_state.selected_dataset = dataset
+            st.session_state.selected_rounds = rounds
+            st.session_state.selected_epochs = epochs
+            st.session_state.selected_lr = lr
+            st.session_state.selected_fraction_train = frac_train
+            st.session_state.selected_fraction_eval = frac_eval
+            st.session_state.selected_alpha = alpha
+            st.session_state.selected_self_balancing = self_balancing
+            st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
+            st.session_state.known_csv_files_before_run = get_all_emission_csvs()
+            
+            write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing)
+            
+            env = os.environ.copy()
+            if wandb_project:
+                env["WANDB_PROJECT"] = wandb_project
+            env["WANDB_MODE"] = wandb_mode
+            
+            if wandb_api_key:
+                env["WANDB_API_KEY"] = wandb_api_key
+            if wandb_entity:
+                env["WANDB_ENTITY"] = wandb_entity
+
+            # Lancement du processus avec le nouvel environnement
+            st.session_state.fl_process = subprocess.Popen(
+                ["flwr", "run", "."], 
+                cwd=PROJECT_DIR, 
+                env=env
+            )
+            st.session_state.etape = 2
+            st.rerun()
 
 # ════════════════════════════════════════════════════════════════════
 # ÉCRAN 2
@@ -187,7 +263,7 @@ elif st.session_state.etape == 2:
                 st.caption("Émissions CO₂")
                 st.line_chart(df[["emissions"]])
         with st.expander("Voir les données en cours"):
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, width="stretch")
     else:
         st.info("Le fichier emission.csv du run courant n'est pas encore disponible.")
 
@@ -297,7 +373,7 @@ elif st.session_state.etape == 3:
                 st.line_chart(df_res[["emissions"]])
 
         with st.expander("Voir les données brutes du CSV"):
-            st.dataframe(df_res, use_container_width=True)
+            st.dataframe(df_res, width="stretch")
 
         st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False),
                            file_name="emission.csv", mime="text/csv")
@@ -308,4 +384,4 @@ elif st.session_state.etape == 3:
         st.session_state.etape = 1
         st.session_state.current_run_csv = None
         st.session_state.fl_process = None
-        st.rerun
+        st.rerun()

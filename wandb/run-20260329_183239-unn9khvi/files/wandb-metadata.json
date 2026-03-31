@@ -1,0 +1,47 @@
+{
+  "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python": "CPython 3.12.3",
+  "startedAt": "2026-03-29T16:32:39.281089Z",
+  "args": [
+    "--app",
+    "/home/ludovic/quickstart-pytorch",
+    "--num-supernodes",
+    "10",
+    "--backend-config",
+    "{\"name\": \"ray\", \"client-resources\": {\"num-cpus\": 2, \"num-gpus\": 1}}"
+  ],
+  "program": "/home/ludovic/quickstart-pytorch/Federated/bin/flower-simulation",
+  "codePath": "Federated/bin/flower-simulation",
+  "codePathLocal": "Federated/bin/flower-simulation",
+  "git": {
+    "remote": "https://github.com/Redcom94/Green-FL-Project.git",
+    "commit": "ee01e0bd1e118c308a30a30eecf75f30589f8a77"
+  },
+  "email": "darksoziopath.steam@hotmail.com",
+  "root": "/home/ludovic/quickstart-pytorch",
+  "host": "LUDOVIC",
+  "executable": "/home/ludovic/quickstart-pytorch/Federated/bin/python3.12",
+  "cpu_count": 6,
+  "cpu_count_logical": 12,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "1081101176832",
+      "used": "16750989312"
+    }
+  },
+  "memory": {
+    "total": "8207409152"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 3060",
+      "memoryTotal": "12884901888",
+      "architecture": "Ampere",
+      "uuid": "GPU-77281eaa-6a88-942f-a235-93e6332a7547"
+    }
+  ],
+  "cudaVersion": "13.2",
+  "writerId": "jbjnb4mk6rv0uk9lghmay4pd35uc216h"
+}

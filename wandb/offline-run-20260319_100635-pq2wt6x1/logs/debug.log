@@ -1,5 +1,0 @@
-2026-03-19 10:06:35,439 INFO    Thread-1 (server_th_with_start_checks):4851 [wandb_init.py:setup_run_log_directory():717] Logging user logs to /mnt/c/users/darks/ProjetBAB3/quickstart-pytorch/wandb/offline-run-20260319_100635-pq2wt6x1/logs/debug.log
-2026-03-19 10:06:35,440 INFO    Thread-1 (server_th_with_start_checks):4851 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to /mnt/c/users/darks/ProjetBAB3/quickstart-pytorch/wandb/offline-run-20260319_100635-pq2wt6x1/logs/debug-internal.log
-2026-03-19 10:06:35,440 INFO    Thread-1 (server_th_with_start_checks):4851 [wandb_init.py:init():844] calling init triggers
-2026-03-19 10:06:35,440 INFO    Thread-1 (server_th_with_start_checks):4851 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
-config: {'_wandb': {}}

@@ -6,7 +6,7 @@ from pathlib import Path
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 
-from .custom_strategy import (
+from pytorchexample.custom_strategy import (
     CustomFedAvg, 
     CustomFedAdam, 
     CustomFedYogi, 
@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from pytorchexample.task import load_centralized_dataset, test
 try:
-    from .user_model import Net  # Importe le modèle fourni par l'utilisateur
+    from pytorchexample.user_model import Net  # Importe le modèle fourni par l'utilisateur
 except ImportError:
-    from .model import Net       # Modèle par défaut si aucun n'est fourni
+    from pytorchexample.model import Net       # Modèle par défaut si aucun n'est fourni
 from codecarbon import EmissionsTracker
 # Dictionnaire de correspondance
 STRATEGIES = {

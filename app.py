@@ -118,7 +118,7 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
 if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
-        st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
+        st.markdown("### 🛠️ Étape 1 : Configuration ")
         st.divider()
 
         col_m, col_d = st.columns(2)

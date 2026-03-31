@@ -142,7 +142,44 @@ class CustomStrategyMixin:
         log(INFO, "")
 
         return result
+    
+    """ les strategy fedavg,fedproxy permettent de calculer les moyennes des poids et tous mais ils ignorent complement les nouvelles metriques client_cpu et client_ram"""
+    def aggregate_train(self, current_round: int, results: Iterable[Message]):
+        """Récupère les poids ET les métriques psutil des clients."""
+        
+        # 1. Appeler la méthode originale pour agréger les poids du modèle
+        # (On utilise super() pour que FedAvg/FedProx fasse son travail habituel)
+        agg_arrays, agg_metrics = super().aggregate_train(current_round, results)
 
+        #super() signifie on cherche d'abrd l'agregation des poids a l'aide de de fedavg 
+
+        # 2. Extraire les données psutil envoyées par les clients
+        cpus = []
+        rams = []
+        
+        for msg in results:
+            # On cherche les clés que tu as définies dans client_app.py
+            metrics = msg.content.get("metrics", {})
+            if "client_cpu" in metrics:
+                cpus.append(metrics["client_cpu"])
+            if "client_ram" in metrics:
+                rams.append(metrics["client_ram"])
+
+        # 3. Calculer la moyenne et logger dans le terminal + W&B
+        if cpus and rams:
+            avg_cpu = sum(cpus) / len(cpus)
+            avg_ram = sum(rams) / len(rams)
+            
+            log(INFO, "\t└──> [Client Monitoring] Avg CPU: %.2f%% | Avg RAM: %.2f%%", avg_cpu, avg_ram)
+            
+            # Ajouter ces moyennes aux métriques pour qu'elles apparaissent dans W&B
+            if agg_metrics is None:
+                agg_metrics = MetricRecord({"avg_cpu": avg_cpu, "avg_ram": avg_ram})
+            else:
+                agg_metrics["avg_cpu"] = avg_cpu
+                agg_metrics["avg_ram"] = avg_ram
+
+        return agg_arrays, agg_metrics
 # --- Strategy Implementations ---
 class CustomFedAvg(CustomStrategyMixin, FedAvg):
     pass

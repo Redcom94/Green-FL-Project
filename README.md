@@ -1,9 +1,3 @@
----
-tags: [quickstart, vision, fds]
-dataset: [CIFAR-10]
-framework: [torch, torchvision]
----
-
 # Benchmarking platform for Federated Learning
 ## Set up the project
 ### Install dependencies and project

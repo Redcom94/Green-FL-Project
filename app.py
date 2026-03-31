@@ -375,7 +375,7 @@ elif st.session_state.etape == 3:
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
 
-        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';'.encode('utf-8')),
+        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                            file_name="emission.csv", mime="text/csv")
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")

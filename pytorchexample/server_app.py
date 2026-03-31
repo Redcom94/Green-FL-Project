@@ -41,7 +41,7 @@ def main(grid: Grid, context: Context) -> None:
     num_rounds = config.get("num-server-rounds", 10)
     lr = config.get("learning-rate", 0.01)
     
-    # Handle the typo gracefully
+
     fraction_train = config.get("fraction-train", 0.1)
     fraction_evaluate = config.get("fraction-evaluate", 0.1)
     min_available_nodes = config.get("num-supernodes", 10)
@@ -103,13 +103,26 @@ def main(grid: Grid, context: Context) -> None:
         result = strategy.start(
             grid=grid,
             initial_arrays=arrays,
-            train_config=ConfigRecord({"lr": lr}),
+            train_config=ConfigRecord({"lr": lr,
+                                       "save_path":str(save_path),
+                                       "strategy":strategy_name,
+                                       "run_id":"01"}),
             num_rounds=num_rounds,
             evaluate_fn=global_evaluate,
         )
     finally:
         tracker.stop()
-        print(f"Carbon emissions recorded in {save_path}/emission.csv")
+        """ le ficheir intel_power_gadget est un fichier cree directement par le drive intel, code carbone ne fzit que de l'ouvrir pour extraire les puissance 
+        ici l'idee est d'utiliser une boucle afin de forcer toute les fichier csv cree de passer en point de virgul quelque soit qui l'a cree"""
+        toute_fichier_csv=list(save_path.glob("*csv"))
+        for csv_path in toute_fichier_csv:
+            try:
+                df_temp=pd.read_csv(csv_path,sep=None,engine='python')
+                df_temp.to_csv(csv_path,sep=';',index=False)
+                print(f" fichier{csv_path.name}")
+            
+            except Exception as e :
+                print(f"impossible de convertir {csv_path.name} : {e}")
         generate_emission_chart(save_path,strategy_name)
 
     # 6. Sauvegarde du modèle final
@@ -134,7 +147,7 @@ def generate_emission_chart(output_path: Path,strategy_name:str):
     """Génère un graphique à partir du fichier CSV de CodeCarbon."""
     csv_file = output_path / "emission.csv"
     if csv_file.exists():
-        df = pd.read_csv(csv_file)
+        df = pd.read_csv(csv_file, sep = ';')
         
         # Exemple de graphe : Énergie consommée par composant
         components = ['cpu_energy', 'gpu_energy', 'ram_energy']

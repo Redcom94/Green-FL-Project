@@ -1,5 +1,8 @@
-streamlit
-pandas
-numpy
-flwr
-codecarbon
+flwr==1.26.1
+flwr-datasets==0.6.0
+torch==2.8.0
+torchvision==0.23.0
+pandas==2.3.3
+git+https://github.com/mlco2/codecarbon.git
+streamlit==1.55.0
+-e .

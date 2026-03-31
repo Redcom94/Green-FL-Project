@@ -8,14 +8,11 @@ framework: [torch, torchvision]
 ## Set up the project
 ### Install dependencies and project
 
-Install the dependencies defined in `pyproject.toml` as well as the `pytorchexample` package.
+Install the dependencies defined in `requirements.txt` as well as the `pyproject.toml` file.
 Use Python 3.13.5
 
 ```bash
 pip install -r requirements.txt
-```
-```bash
-pip install -U "flwr[simulation]"
 ```
 
 ## Run the project

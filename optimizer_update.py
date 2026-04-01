@@ -34,7 +34,7 @@ class GreenOptimizationExpert:
             else:
                 f.write("[BRAVO] Sobriété numérique respectée. Votre modèle est léger.\n")
 
-            # Règle 2 : Analyse Hardware (Barre orange de la RAM dans ta vidéo)
+            # Règle 2 : Analyse Hardware 
             if ram_watt > cpu_watt:
                 f.write(f"[ALERTE] La RAM ({ram_watt:.1f}W) consomme plus que le CPU. Évitez de charger des jeux de données trop lourds en mémoire d'un coup.\n")
             

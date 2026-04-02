@@ -208,10 +208,10 @@ if st.session_state.etape == 1:
                 env["WANDB_API_KEY"] = wandb_api_key
             if wandb_entity:
                 env["WANDB_ENTITY"] = wandb_entity
-
+            num_clients_str = str(st.session_state.selected_clients)
             # Lancement du processus avec le nouvel environnement
             st.session_state.fl_process = subprocess.Popen(
-                ["flwr", "run", "."], 
+                ["bash", "local_test_run.sh", num_clients_str], 
                 cwd=PROJECT_DIR, 
                 env=env
             )
@@ -375,7 +375,7 @@ elif st.session_state.etape == 3:
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
 
-        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';'.encode('utf-8')),
+        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                            file_name="emission.csv", mime="text/csv")
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")

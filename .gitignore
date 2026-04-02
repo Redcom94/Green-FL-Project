@@ -1,0 +1,25 @@
+# Environnements virtuels (le plus lourd !)
+.venv/
+env/
+Federated/
+bin/
+lib/
+include/
+share/
+
+# Données et Datasets
+data/
+datasets/
+*.zip
+*.tar.gz
+
+# Sorties et Logs
+outputs/
+*.log
+*.csv
+__pycache__/
+*.pyc
+
+# Divers
+.git/
+.ipynb_checkpoints/

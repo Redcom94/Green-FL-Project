@@ -92,7 +92,7 @@ def main(grid: Grid, context: Context) -> None:
 
     # 5. Lancement de l'entraînement
     tracker=EmissionsTracker(
-        project_name=config.get("strategy", "fedavg").lower(),
+        project_name=strategy_name,
         output_dir=str(save_path),
         output_file="emission.csv",
         measure_power_secs=15
@@ -107,23 +107,43 @@ def main(grid: Grid, context: Context) -> None:
                                        "save_path":str(save_path),
                                        "strategy":strategy_name,
                                        "run_id":"01"}),
+            evaluate_config=ConfigRecord({
+                "save_path": str(save_path),
+            }),
             num_rounds=num_rounds,
             evaluate_fn=global_evaluate,
         )
     finally:
         tracker.stop()
-        """ le ficheir intel_power_gadget est un fichier cree directement par le drive intel, code carbone ne fzit que de l'ouvrir pour extraire les puissance 
-        ici l'idee est d'utiliser une boucle afin de forcer toute les fichier csv cree de passer en point de virgul quelque soit qui l'a cree"""
-        toute_fichier_csv=list(save_path.glob("*csv"))
-        for csv_path in toute_fichier_csv:
+        # --- CORRECTION DES DÉCIMALES ET FORMATS CSV ---
+        print("\n🔄 Harmonisation des fichiers CSV pour Excel FR...")
+        fichiers_csv = list(save_path.glob("*.csv"))
+        
+        for csv_path in fichiers_csv:
             try:
-                df_temp=pd.read_csv(csv_path,sep=None,engine='python')
-                df_temp.to_csv(csv_path,sep=';',index=False)
-                print(f" fichier{csv_path.name}")
-            
-            except Exception as e :
-                print(f"impossible de convertir {csv_path.name} : {e}")
-        generate_emission_chart(save_path,strategy_name)
+                # 1. On lit le fichier sans se soucier du séparateur
+                # On utilise engine='python' pour détecter si c'est déjà du ';' ou du ','
+                df_temp = pd.read_csv(csv_path, sep=None, engine='python')
+                
+                # 2. On s'assure que les colonnes numériques sont bien des nombres
+                # Si Excel a déjà mis des virgules, on les remet en points pour que Pandas comprenne
+                cols_numeriques = ['emissions', 'emissions_rate', 'cpu_power', 'gpu_power', 
+                                 'ram_power', 'cpu_energy', 'gpu_energy', 'ram_energy', 'energy_consumed']
+                
+                for col in cols_numeriques:
+                    if col in df_temp.columns:
+                        # On force la conversion en numérique, au cas où c'est lu comme du texte
+                        df_temp[col] = pd.to_numeric(df_temp[col].astype(str).str.replace(',', '.'), errors='coerce')
+
+                # 3. On sauvegarde proprement pour Excel FR
+                # POINT-VIRGULE pour les colonnes, VIRGULE pour les décimales
+                df_temp.to_csv(csv_path, sep=';', decimal=',', index=False)
+                print(f" ✅ Nettoyage terminé pour : {csv_path.name}")
+            except Exception as e:
+                print(f" ⚠️ Erreur sur {csv_path.name} : {e}")
+
+        # Génération du graphique après conversion
+        generate_emission_chart(save_path, strategy_name)
 
     # 6. Sauvegarde du modèle final
     print("\n💾 Saving final model to disk...")
@@ -143,20 +163,38 @@ def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
 
     return MetricRecord({"accuracy": test_acc, "loss": test_loss})
 
-def generate_emission_chart(output_path: Path,strategy_name:str):
-    """Génère un graphique à partir du fichier CSV de CodeCarbon."""
+def generate_emission_chart(output_path: Path, strategy_name: str):
+    """Génère un graphique à partir du fichier converti (format FR)."""
     csv_file = output_path / "emission.csv"
     if csv_file.exists():
-        df = pd.read_csv(csv_file, sep = ';')
-        
-        # Exemple de graphe : Énergie consommée par composant
-        components = ['cpu_energy', 'gpu_energy', 'ram_energy']
-        values = [df[c].sum() for c in components if c in df.columns]
-        labels = [c.replace('_energy', '').upper() for c in components if c in df.columns]
+        try:
+            # On lit avec le nouveau format (point-virgule et virgule)
+            df = pd.read_csv(csv_file, sep=';', decimal=',')
+            
+            components = ['cpu_energy', 'gpu_energy', 'ram_energy']
+            # Filtrer les colonnes présentes
+            cols_to_plot = [c for c in components if c in df.columns]
+            
+            if not cols_to_plot:
+                print(" ⚠️ Aucune colonne d'énergie trouvée.")
+                return
 
-        plt.figure(figsize=(8, 5))
-        plt.bar(labels, values, color=['#4CAF50', '#2196F3', '#FF9800'])
-        plt.ylabel('Energy Consumed (kWh)')
-        plt.title(f'Energy Consumption by Hardware Component,{strategy_name.upper()}')
-        plt.savefig(output_path / f"{strategy_name.lower()}_energy_breakdown.png")
-        plt.close()
+            values = [df[c].sum() for c in cols_to_plot]
+            labels = [c.replace('_energy', '').upper() for c in cols_to_plot]
+
+            plt.figure(figsize=(10, 6))
+            bars = plt.bar(labels, values, color=['#4CAF50', '#2196F3', '#FF9800'])
+            plt.ylabel('Energy Consumed (kWh)')
+            plt.title(f'Energy Consumption Breakdown - {strategy_name.upper()}')
+            
+            # Ajouter les valeurs au-dessus des barres
+            for bar in bars:
+                yval = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2, yval, f'{yval:.6f}', va='bottom', ha='center')
+
+            plt.tight_layout()
+            plt.savefig(output_path / f"{strategy_name.lower()}_energy_breakdown.png")
+            plt.close()
+            print(f" 📊 Graphique sauvegardé dans : {output_path}")
+        except Exception as e:
+            print(f" ⚠️ Erreur graphique : {e}")

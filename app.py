@@ -33,11 +33,20 @@ for key, default in [
         st.session_state[key] = default
 
 # --- Fonctions utilitaires ---
-def safe_value(value, unit=""):
-    if pd.isna(value): return "N/A"
-    if isinstance(value, (int, float, np.integer, np.floating)):
-        return f"{value:.6f}{unit}" if abs(value) < 1 else f"{value:.3f}{unit}"
-    return str(value)
+def safe_value(value, unit="", precision=4):
+    try:
+        # On force la conversion en float au cas où c'est du texte
+        num_value = float(str(value).replace(',', '.'))
+        
+        if pd.isna(num_value): 
+            return "N/A"
+            
+        # Formatage strict avec la précision choisie
+        formatted = f"{num_value:.{precision}f}".replace('.', ',')
+        return f"{formatted}{unit}"
+    except (ValueError, TypeError):
+        # Si vraiment ce n'est pas un chiffre (ex: "N/A"), on renvoie tel quel
+        return str(value)
 
 def get_latest_csv():
     """Récupère le chemin du tout dernier fichier emission.csv créé dans le dossier outputs."""
@@ -409,3 +418,4 @@ elif st.session_state.etape == 3:
         st.session_state.current_run_csv = None
         st.session_state.fl_process = None
         st.rerun()
+

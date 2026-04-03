@@ -123,8 +123,8 @@ if st.session_state.etape == 1:
 
         col_m, col_d = st.columns(2)
         with col_m:
-            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py ou .pt)</p></div>', unsafe_allow_html=True)
-            model_file = st.file_uploader("Fichier", type=["py", "pt"], label_visibility="collapsed")
+            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py)</p></div>', unsafe_allow_html=True)
+            model_file = st.file_uploader("Fichier", type=["py"], label_visibility="collapsed")
         if model_file is not None:
             # Définition du chemin cible
             target_path = PROJECT_DIR / "pytorchexample" / "user_model.py"

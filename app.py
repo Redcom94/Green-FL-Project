@@ -145,15 +145,15 @@ if st.session_state.etape == 1:
             model_weights = st.file_uploader("Fichier", type=["pt"], label_visibility="collapsed")
         if model_weights is not None:
             # Définition du chemin cible
-            target_path = PROJECT_DIR / "final_model.pt"
+            target_path2 = PROJECT_DIR / "final_model.pt"
             
             # Création du dossier s'il n'existe pas
-            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path2.parent.mkdir(parents=True, exist_ok=True)
             
             # Écriture du contenu
-            with open(target_path, "wb") as f:
-                f.write(model_file.getbuffer())
-            st.success(f"Modèle sauvegardé sous : {target_path.name}")      
+            with open(target_path2, "wb") as f:
+                f.write(model_weights.getbuffer())
+            st.success(f"Modèle sauvegardé sous : {target_path2.name}")      
         st.markdown("#### 🚀 Hyperparamètres de base")
         c_s, c_r, c_e, c_l = st.columns(4)
         with c_s:

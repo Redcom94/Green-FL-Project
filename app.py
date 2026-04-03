@@ -56,7 +56,7 @@ def get_new_csv_after_run():
 
 def read_csv_safely(path):
     if path is None: return None
-    try: return pd.read_csv(path)
+    try: return pd.read_csv(path, sep=';')
     except: return None
 
 def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing):
@@ -118,7 +118,7 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
 if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
-        st.markdown("### 🛠️ Étape 1 : Configuration ")
+        st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
         st.divider()
 
         col_m, col_d = st.columns(2)
@@ -375,7 +375,7 @@ elif st.session_state.etape == 3:
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
 
-        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False),
+        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                            file_name="emission.csv", mime="text/csv")
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")

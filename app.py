@@ -125,7 +125,17 @@ if st.session_state.etape == 1:
         with col_m:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py ou .pt)</p></div>', unsafe_allow_html=True)
             model_file = st.file_uploader("Fichier", type=["py", "pt"], label_visibility="collapsed")
-
+        if model_file is not None:
+            # Définition du chemin cible
+            target_path = PROJECT_DIR / "pytorchexample" / "user_model.py"
+            
+            # Création du dossier s'il n'existe pas
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Écriture du contenu
+            with open(target_path, "wb") as f:
+                f.write(model_file.getbuffer())
+            st.success(f"Modèle sauvegardé sous : {target_path.name}")       
         with col_d:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
             dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")

@@ -23,7 +23,16 @@ class CustomStrategyMixin:
     def set_save_path(self, path: Path):
         """Set the path where wandb logs and model checkpoints will be saved."""
         self.save_path = path
-
+    def configure_train(self, current_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid) -> Iterable[Message]:
+        """Injection du round dans la config avant l'entraînement."""
+        # On ajoute le round à la config existante
+        config["server_round"] = current_round
+        # On appelle la méthode originale de la classe parente (FedAvg, FedProx, etc.)
+        return super().configure_train(current_round, arrays, config, grid)
+    def configure_evaluate(self, current_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid) -> Iterable[Message]:
+        """Injection du round dans la config avant l'évaluation."""
+        config["server_round"] = current_round
+        return super().configure_evaluate(current_round, arrays, config, grid)
     def _update_best_acc(self, current_round: int, accuracy: float, arrays: ArrayRecord) -> None:
         if accuracy > self.best_acc_so_far:
             self.best_acc_so_far = accuracy

@@ -121,7 +121,7 @@ if st.session_state.etape == 1:
         st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
         st.divider()
 
-        col_m, col_d = st.columns(2)
+        col_m, col_d, col_p = st.columns(2)
         with col_m:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Architecture</h4><p>Modèle (.py)</p></div>', unsafe_allow_html=True)
             model_file = st.file_uploader("Fichier", type=["py"], label_visibility="collapsed")
@@ -139,7 +139,20 @@ if st.session_state.etape == 1:
         with col_d:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
             dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")
-
+        with col_p:
+            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Poids</h4><p>Modèle (.pt)</p></div>', unsafe_allow_html=True)
+            model_weights = st.file_uploader("Fichier", type=["pt"], label_visibility="collapsed")
+        if model_weights is not None:
+            # Définition du chemin cible
+            target_path2 = PROJECT_DIR / "final_model.pt"
+            
+            # Création du dossier s'il n'existe pas
+            target_path2.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Écriture du contenu
+            with open(target_path2, "wb") as f:
+                f.write(model_weights.getbuffer())
+            st.success(f"Modèle sauvegardé sous : {target_path2.name}")  
         st.markdown("#### 🚀 Hyperparamètres de base")
         c_s, c_r, c_e, c_l = st.columns(4)
         with c_s:

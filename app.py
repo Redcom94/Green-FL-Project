@@ -28,6 +28,8 @@ for key, default in [
     ("selected_self_balancing", True),
     ("known_csv_files_before_run", []),
     ("current_run_csv", None),
+    ("known_csv_files_before_run_2",[]),
+    ("known_csv_files_before_run_3",[]),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -47,19 +49,21 @@ def safe_value(value, unit="", precision=4):
     except (ValueError, TypeError):
         # Si vraiment ce n'est pas un chiffre (ex: "N/A"), on renvoie tel quel
         return str(value)
-def get_latest_csv():
+def get_latest_csv(data):
     """Récupère le chemin du tout dernier fichier emission.csv créé dans le dossier outputs."""
-    csvs = get_all_emission_csvs()
+    csvs = get_all_emission_csvs(data)
     return csvs[-1] if csvs else None
 
-def get_all_emission_csvs():
+def get_all_emission_csvs(data):
     outputs_dir = PROJECT_DIR / "outputs"
     if not outputs_dir.exists(): return []
-    return sorted(outputs_dir.glob("**/emission.csv"), key=lambda p: p.stat().st_mtime)
+    return sorted(outputs_dir.glob(f"**/{data}"), key=lambda p: p.stat().st_mtime)
 
-def get_new_csv_after_run():
+def get_new_csv_after_run(data):
     known = set(str(p) for p in st.session_state.known_csv_files_before_run)
-    new = [p for p in get_all_emission_csvs() if str(p) not in known]
+    known.update(str(p) for p in st.session_state.known_csv_files_before_run_2)
+    known.update(str(p) for p in st.session_state.known_csv_files_before_run_3)
+    new = [p for p in get_all_emission_csvs(data) if str(p) not in known]
     return new[-1] if new else None
 
 def read_csv_safely(path):
@@ -226,7 +230,9 @@ if st.session_state.etape == 1:
             st.session_state.selected_alpha = alpha
             st.session_state.selected_self_balancing = self_balancing
             st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
-            st.session_state.known_csv_files_before_run = get_all_emission_csvs()
+            st.session_state.known_csv_files_before_run = get_all_emission_csvs("emission.csv")
+            st.session_state.known_csv_files_before_run_2 = get_all_emission_csvs("EXCEL_emissions_history.csv")
+            st.session_state.known_csv_files_before_run_3 = get_all_emission_csvs("EXCEL_eval_emissions_history.csv")
             
             write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing)
             
@@ -271,7 +277,7 @@ elif st.session_state.etape == 2:
         process_running = st.session_state.fl_process.poll() is None
 
     if st.session_state.current_run_csv is None:
-        csv = get_new_csv_after_run()
+        csv = get_new_csv_after_run("emission.csv")
         if csv:
             st.session_state.current_run_csv = csv
 
@@ -329,7 +335,7 @@ elif st.session_state.etape == 3:
     st.title("📊 Étape 3 : Résultats finaux")
     st.divider()
 
-    csv_path = st.session_state.current_run_csv or get_latest_csv()
+    csv_path = st.session_state.current_run_csv or get_latest_csv("emission.csv")
     df_res = read_csv_safely(csv_path)
 
     if df_res is not None and not df_res.empty:
@@ -406,8 +412,30 @@ elif st.session_state.etape == 3:
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
 
-        st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
-                           file_name="emission.csv", mime="text/csv")
+        csv_1, csv_2, csv_3 = st.columns(3)
+        with csv_1:
+            st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
+                               file_name="emission.csv", mime="text/csv")
+        with csv_2:
+            path_hist = get_latest_csv("EXCEL_emissions_history.csv")
+            if path_hist:
+                df_hist = pd.read_csv(path_hist, sep=';')
+                st.download_button("📥 Historique Global", 
+                                   data=df_hist.to_csv(index=False, sep=';').encode('utf-8'),
+                                   file_name="history.csv", mime="text/csv")
+            else:
+                st.info("Historique non dispo.")
+
+        # 3. Le rapport d'évaluation
+        with csv_3:
+            path_eval = get_latest_csv("EXCEL_eval_emissions_history.csv")
+            if path_eval:
+                df_eval = pd.read_csv(path_eval, sep=';')
+                st.download_button("📥 Rapport Évaluation", 
+                                   data=df_eval.to_csv(index=False, sep=';').encode('utf-8'),
+                                   file_name="evaluation.csv", mime="text/csv")
+            else:
+                st.info("Éval non dispo.")
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")
 

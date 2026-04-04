@@ -19,3 +19,5 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 Open http:localhost:8501/ in your browser.
+
+⚠️ **WARNING:** : Files must be contained in a folder named Green-FL-Project

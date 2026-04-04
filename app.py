@@ -234,7 +234,7 @@ if st.session_state.etape == 1:
             st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
             st.session_state.known_csv_files_before_run = get_all_emission_csvs("emission.csv")
             st.session_state.known_csv_files_before_run_2 = get_all_emission_csvs("EXCEL_emissions_history.csv")
-            st.session_state.known_csv_files_before_run_3 = get_all_emission_csvs("EXCEL_emissions_eval_history.csv")
+            st.session_state.known_csv_files_before_run_3 = get_all_emission_csvs("EXCEL_eval_emissions_history.csv")
             
             write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing)
             

@@ -52,7 +52,7 @@ def safe_value(value, unit="", precision=4):
 
 def get_latest_csv(data):
     """Récupère le chemin du tout dernier fichier emission.csv créé dans le dossier outputs."""
-    csvs = get_all_emissions_csvs(data)
+    csvs = get_all_emission_csvs(data)
     return csvs[-1] if csvs else None
 
 def get_all_emission_csvs(data):
@@ -233,8 +233,8 @@ if st.session_state.etape == 1:
             st.session_state.selected_self_balancing = self_balancing
             st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
             st.session_state.known_csv_files_before_run = get_all_emission_csvs("emission.csv")
-            st.session_state.known_csv_files_before_run_2 = get_all_emissions_csvs("EXCEL_emissions_history.csv")
-            st.session_state.known_csv_files_before_run_3 = get_all_emissions_csvs("EXCEL_emissions_eval_history.csv")
+            st.session_state.known_csv_files_before_run_2 = get_all_emission_csvs("EXCEL_emissions_history.csv")
+            st.session_state.known_csv_files_before_run_3 = get_all_emission_csvs("EXCEL_emissions_eval_history.csv")
             
             write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing)
             
@@ -429,7 +429,7 @@ elif st.session_state.etape == 3:
 
         # 3. Le rapport d'évaluation
         with csv_3:
-            path_eval = get_latest_csv("EXCEL_emissions_eval_history.csv")
+            path_eval = get_latest_csv("EXCEL_eval_emissions_history.csv")
             if path_eval:
                 df_eval = pd.read_csv(path_eval, sep=';')
                 st.download_button("📥 Rapport Évaluation", 
@@ -445,4 +445,3 @@ elif st.session_state.etape == 3:
         st.session_state.current_run_csv = None
         st.session_state.fl_process = None
         st.rerun()
-

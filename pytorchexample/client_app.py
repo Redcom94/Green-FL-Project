@@ -125,7 +125,7 @@ def evaluate(msg: Message, context: Context):
     # Chemins de sauvegarde (Logique identique au train)
     save_path_str = msg.content.get("config", {}).get("save_path", ".")
     save_path = Path(save_path_str)
-    save_path.mkdir(parents=True, exist_ok=Tru
+    save_path.mkdir(parents=True, exist_ok=True)
     # Load the model and initialize it with the received weights
     model = Net()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())

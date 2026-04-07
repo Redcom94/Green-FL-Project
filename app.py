@@ -7,6 +7,13 @@ import subprocess
 import toml
 from pathlib import Path
 
+OPTIM_TIPS = {
+    "FedAvg": " **Optimisation Green** : Idéal pour limiter la communication. Activez l'Early Stopping local pour économiser du CPU sur les clients qui convergent vite.",
+    "FedProx": " **Optimisation Green** : Ajustez le **Mu**. Un Mu faible réduit la charge de calcul locale mais peut ralentir la convergence globale.",
+    "FedAdam": " **Optimisation Green** : Très efficace mais gourmand en RAM. Réduisez la **Fraction Entraînement** pour économiser l'énergie globale du réseau.",
+    "FedYogi": " **Optimisation Green** : Similaire à Adam, mais plus stable. Utilisez un **Learning Rate** plus élevé pour atteindre la précision cible en moins de rounds.",
+    "FedAdagrad": " **Optimisation Green** : Moins de paramètres à synchroniser. Excellent pour les connexions instables afin d'éviter les ré-émissions de paquets réseau."
+}
 PROJECT_DIR = Path(__file__).resolve().parent
 
 st.set_page_config(page_title="Green FL Platform", layout="wide")
@@ -96,14 +103,14 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
     with open(pyproject_path, "w") as f:
         toml.dump(pyproject_data, f)
 
-    # --- 2. Mise à jour de C:\Users\darks\.flwr\config.toml ---
+    # --- 2. Mise à jour de \.flwr\config.toml ---
     flwr_global_config = Path.home() / ".flwr" / "config.toml"
     
     if flwr_global_config.exists():
         try:
             data_global = toml.load(flwr_global_config)
             
-            # On accède à la structure que vous avez vue
+            # On accède à la structure
             # superlink -> local -> options -> num_supernodes
             if "superlink" in data_global and "local" in data_global["superlink"]:
                 local_section = data_global["superlink"]["local"]
@@ -112,10 +119,6 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
                 if "options" not in local_section:
                     local_section["options"] = {}
                 local_section["options"]["num-supernodes"] = num_clients
-                
-                # SÉCURITÉ : On retire le run_id s'il existe pour éviter le conflit SuperLink
-                # .pop(key, None) ne génère pas d'erreur si la clé est absente
-                local_section.pop("run_id", None)
                 
                 with open(flwr_global_config, "w") as f:
                     toml.dump(data_global, f)
@@ -131,7 +134,7 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
 if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
-        st.markdown("### 🛠️ Étape 1 : Configuration (10 clients)")
+        st.markdown("### 🛠️ Étape 1 : Configuration")
         st.divider()
 
         col_m, col_d, col_p = st.columns(3)
@@ -166,7 +169,22 @@ if st.session_state.etape == 1:
             # Écriture du contenu
             with open(target_path2, "wb") as f:
                 f.write(model_weights.getbuffer())
-            st.success(f"Modèle sauvegardé sous : {target_path2.name}")      
+            st.success(f"Modèle sauvegardé sous : {target_path2.name}")
+        with st.expander("📖 Consulter le guide des stratégies (État de l'Art)", expanded=False):
+            st.markdown("""
+            <div style="text-align: center;">
+                
+            | Stratégie | Points Forts | Points Faibles | Impact Énergie |
+            | :--- | :--- | :--- | : --- |
+            | **FedAvg** | Simplicité / Baseline | Extremement mauvais en cas de données hétérogènes| 🟢 Faible |
+            | **FedProx** | Robustesse (Clients lents) | Dépend fortement du choix de μ  | 🟡 Moyen |
+            | **FedAdagrad**| **Données éparses / Adaptatif** | Perd d'efficacité au fur et à mesure des rounds |🟡 Moyen |
+            | **FedAdam/Yogi**| Convergence ultra-rapide | Dépend de nombreux hyperparamètres |🔴 Élevé |
+                
+            </div>
+            """, unsafe_allow_html=True)
+            st.info("💡 **Focus FedAdagrad** : Idéal si vos clients ont des données très spécifiques (ex: imagerie médicale rare) car elle adapte le pas d'apprentissage à la rareté des features.")
+        st.write("")      
         st.markdown("#### 🚀 Hyperparamètres de base")
         c_s, c_r, c_e, c_l = st.columns(4)
         with c_s:
@@ -177,7 +195,7 @@ if st.session_state.etape == 1:
             epochs = st.selectbox("Epochs locales", [1, 2, 3])
         with c_l:
             lr = st.number_input("Learning Rate", min_value=0.0001, value=0.01, format="%.4f")
-
+        st.info(OPTIM_TIPS.get(strategie, "Sélectionnez une stratégie."))
         st.markdown("#### ⚖️ Sélection des clients")
         clients_number = st.slider("Nombre de clients", 2, 100, st.session_state.selected_clients, help="Nombre de clients")
         default_train = min(8, clients_number)

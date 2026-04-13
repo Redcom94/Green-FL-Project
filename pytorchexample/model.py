@@ -1,5 +1,7 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import AutoModelForImageClassification
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
 
@@ -19,22 +21,3 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
-    
-
-class DynamicNet(nn.Module): # Un modèle dynamique qui peut être configuré à partir d'un fichier .JSON. Idéal pour la sécurité (pas de code arbitraire à exécuter) et la flexibilité.
-    def __init__(self, config):
-        super(DynamicNet, self).__init__()
-        layers = []
-        
-        for layer_cfg in config["layers"]:
-            layer_type = layer_cfg["type"]
-            params = layer_cfg["params"]
-            
-            # On récupère la classe dans torch.nn (ex: nn.Conv2d)
-            layer_class = getattr(nn, layer_type)
-            layers.append(layer_class(**params))
-        
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.model(x)

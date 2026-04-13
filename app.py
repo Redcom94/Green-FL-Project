@@ -5,7 +5,11 @@ import time
 import os
 import subprocess
 import toml
+import psutil
+import json
+import random
 from pathlib import Path
+import wandb
 
 OPTIM_TIPS = {
     "FedAvg": " **Optimisation Green** : Idéal pour limiter la communication. Activez l'Early Stopping local pour économiser du CPU sur les clients qui convergent vite.",
@@ -33,15 +37,24 @@ for key, default in [
     ("selected_model_name", None),
     ("selected_alpha", 0.1),
     ("selected_self_balancing", True),
+    ("selected_blur_config", {}),
     ("known_csv_files_before_run", []),
     ("current_run_csv", None),
     ("known_csv_files_before_run_2",[]),
     ("known_csv_files_before_run_3",[]),
+    ("selected_small_clients", 0),
+    ("selected_medium_clients", 0),
+    ("selected_big_clients", 0),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
 
 # --- Fonctions utilitaires ---
+@st.cache_resource
+def get_global_state():
+    # Cet objet sera partagé par TOUS les utilisateurs et TOUS les rafraîchissements
+    return {"running": False, "process": None, "config": {}}
+
 def safe_value(value, unit="", precision=4):
     try:
         # On force la conversion en float au cas où c'est du texte
@@ -79,14 +92,17 @@ def read_csv_safely(path):
     try: return pd.read_csv(path, sep=';')
     except: return None
 
-def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing):
+def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
     # --- 1. Mise à jour de pyproject.toml ---
     pyproject_path = PROJECT_DIR / "pyproject.toml"
     pyproject_data = toml.load(pyproject_path)
     cfg = pyproject_data["tool"]["flwr"]["app"]["config"]
-    
+    cfg["img-size"] = img_size
+    cfg["num-channels"] = num_channels
+    cfg["num-classes"] = num_classes
     cfg["strategy"] = strategy.lower()
     cfg["num-server-rounds"] = rounds
+    cfg["dataset-name"] = dataset_name
     cfg["local-epochs"] = epochs
     cfg["learning-rate"] = lr
     cfg["num-supernodes"] = num_clients
@@ -96,6 +112,12 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
     cfg["fraction-evaluate"] = f_eval
     cfg["alpha"] = alpha
     cfg["self-balancing"] = self_balancing
+    cfg["small-clients"] = small_c
+    cfg["medium-clients"] = medium_c
+    cfg["big-clients"] = big_c
+    
+    # blur_config : dict {client_id -> blur_percent}, sérialisé en JSON string pour pyproject.toml
+    cfg["blur-config"] = json.dumps({str(k): v for k, v in (blur_config or {}).items()})
 
     for key, val in extra_opts.items():
         cfg[key] = val
@@ -131,6 +153,20 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
 # ════════════════════════════════════════════════════════════════════
 # ÉCRAN 1 : CONFIGURATION
 # ════════════════════════════════════════════════════════════════════
+# --- Logique de récupération après rafraîchissement ---
+global_status = get_global_state()
+if global_status["running"]:
+    st.session_state.etape = 2
+    st.session_state.fl_process = global_status["process"]
+    
+    # ON RE-REMPLIT LE SESSION STATE LOCAL DEPUIS LE GLOBAL
+    conf = global_status["config"]
+    st.session_state.selected_strategy = conf.get("strategy")
+    st.session_state.selected_dataset = conf.get("dataset")
+    st.session_state.selected_rounds = conf.get("rounds")
+    st.session_state.selected_epochs = conf.get("epochs")
+    st.session_state.selected_clients = conf.get("clients")
+    st.session_state.selected_model_name = conf.get("model_name")
 if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
@@ -155,7 +191,38 @@ if st.session_state.etape == 1:
 
         with col_d:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #2196F3;height:160px;"><h4>📂 Données</h4><p>Jeu de données cible</p></div>', unsafe_allow_html=True)
-            dataset = st.selectbox("Dataset", ["CIFAR-10", "CheXpert"], label_visibility="collapsed")
+            
+            # 1. Sélection du type
+            dataset_selection = st.selectbox("Dataset", ["uoft-cs/cifar10", "danjacobellis/chexpert", "custom (EXPERIMENTAL)"], label_visibility="collapsed")
+            
+            # 2. Assignation des valeurs (Logique robuste)
+            if dataset_selection == "uoft-cs/cifar10":
+                dataset = "uoft-cs/cifar10"
+                
+            elif dataset_selection == "danjacobellis/chexpert":
+                dataset = "danjacobellis/chexpert"
+                
+            else: # Cas "custom"
+                st.info("🛠️ **Configuration Modèle & Dataset Custom**")
+                st.markdown("""
+                <div style="font-size: 0.85rem; line-height: 1.4;">
+                ⚠️ <b>Conditions de succès :</b>
+                <ul>
+                    <li><b>Labels : </b> Fonctionne uniquement avec du mono-labeling (càd un seul label par image)
+                    <li><b>Dataset :</b> Doit être sur HuggingFace (Public ou avec Token).</li>
+                    <li><b>Mapping :</b> Colonnes nommées <code>image</code> (ou <code>img</code>) et <code>label</code>.</li>
+                    <li><b>Cohérence :</b> Assurez-vous que la <b>Taille Image</b> et les <b>Canaux</b> saisis correspondent strictement à l'architecture de votre modèle.</li>
+                    <li><b>Sortie :</b> Le modèle doit retourner un objet avec un attribut <code>.logits</code> ou être compatible avec votre boucle d'entraînement.</li>
+                </ul>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                dataset = st.text_input("Chemin HuggingFace", value="", help="ex: user/my-dataset")
+        st.markdown("#### Paramètres du modèle")        
+        c_img, c_chan, c_cls = st.columns(3)
+        img_size = c_img.number_input("Taille Image", value=32, min_value=1)
+        num_channels = c_chan.selectbox("Canaux", [1, 3], index=1)
+        num_classes = c_cls.number_input("Nombre de classes", value=10, min_value=2)
         with col_p:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Poids</h4><p>Modèle (.pt)</p></div>', unsafe_allow_html=True)
             model_weights = st.file_uploader("Fichier", type=["pt"], label_visibility="collapsed")
@@ -172,17 +239,13 @@ if st.session_state.etape == 1:
             st.success(f"Modèle sauvegardé sous : {target_path2.name}")
         with st.expander("📖 Consulter le guide des stratégies (État de l'Art)", expanded=False):
             st.markdown("""
-            <div style="text-align: center;">
-                
-            | Stratégie | Points Forts | Points Faibles | Impact Énergie |
-            | :--- | :--- | :--- | : --- |
-            | **FedAvg** | Simplicité / Baseline | Extremement mauvais en cas de données hétérogènes| 🟢 Faible |
-            | **FedProx** | Robustesse (Clients lents) | Dépend fortement du choix de μ  | 🟡 Moyen |
-            | **FedAdagrad**| **Données éparses / Adaptatif** | Perd d'efficacité au fur et à mesure des rounds |🟡 Moyen |
-            | **FedAdam/Yogi**| Convergence ultra-rapide | Dépend de nombreux hyperparamètres |🔴 Élevé |
-                
-            </div>
-            """, unsafe_allow_html=True)
+| Stratégie | Points Forts | Points Faibles | Impact Énergie |
+| :--- | :--- | :--- | :--- |
+| **FedAvg** | Simplicité / Baseline | Très mauvais si données hétérogènes | 🟢 Faible |
+| **FedProx** | Robustesse (Clients lents) | Dépend fortement du choix de μ | 🟡 Moyen |
+| **FedAdagrad**| **Données éparses / Adaptatif** | Moins efficace au fil des rounds | 🟡 Moyen |
+| **FedAdam/Yogi**| Convergence ultra-rapide | Dépend de nombreux hyperparamètres | 🔴 Élevé |
+            """)
             st.info("💡 **Focus FedAdagrad** : Idéal si vos clients ont des données très spécifiques (ex: imagerie médicale rare) car elle adapte le pas d'apprentissage à la rareté des features.")
         st.write("")      
         st.markdown("#### 🚀 Hyperparamètres de base")
@@ -221,8 +284,111 @@ if st.session_state.etape == 1:
                         extra_opts["beta-1"] = st.slider("Beta 1", 0.0, 1.0, 0.9)
                         extra_opts["beta-2"] = st.slider("Beta 2", 0.0, 1.0, 0.99)
         st.markdown("#### Options de partitionnement (Dirichlet)")
-        alpha = st.slider("Alpha", 0.0, 1.0, 0.1, help="Plus alpha est petit, plus les données sont hétérogènes entre les clients. Avec alpha proche de 0, chaque client aura principalement des exemples d'une seule classe. Avec alpha élevé (ex: 1.0), les données seront plus équilibrées entre les clients. Ceci permet de simuler un label skew.")
+        alpha = st.slider("Alpha", 0.0, 100.0, 0.1, help="Plus alpha est petit, plus les données sont hétérogènes entre les clients. Avec alpha proche de 0, chaque client aura principalement des exemples d'une seule classe. Avec alpha élevé, les données seront plus équilibrées entre les clients. Ceci permet de simuler un label skew.")
         self_balancing = st.checkbox("Équilibrage automatique", value=True, help="Activez cette option pour que chaque client ait une quantité de données similaire, même avec un alpha faible. Le partitionnement restera hétérogène en termes de classes, mais la taille des partitions sera plus équilibrée.")
+        
+        st.markdown("#### 🌫️ Dégradation des images par client (Feature Skew)")
+        st.caption("Simule des clients avec des capteurs de qualité variable — certains clients reçoivent des images floues, d'autres non.")
+
+        blur_mode = st.radio(
+            "Mode de partition du flou",
+            ["✅ Aucun flou", "🎲 Partition automatique", "🎛️ Partition arbitraire"],
+            horizontal=True,
+            help="Automatique : vous choisissez quels clients sont floutés, le niveau est tiré aléatoirement. Arbitraire : vous définissez le niveau de flou de chaque client manuellement."
+        )
+
+        blur_config = {}  # vide = pas de flou pour personne
+
+        if blur_mode == "🎲 Partition automatique":
+            st.markdown("**Sélectionnez les clients à dégrader :**")
+            affected_clients = []
+            cols_per_row = 10
+            client_ids = list(range(clients_number))
+            rows = [client_ids[i:i+cols_per_row] for i in range(0, len(client_ids), cols_per_row)]
+            for row in rows:
+                cols = st.columns(len(row))
+                for col, cid in zip(cols, row):
+                    checked = col.checkbox(f"C{cid}", key=f"auto_blur_client_{cid}", value=False)
+                    if checked:
+                        affected_clients.append(cid)
+
+            if affected_clients:
+                max_blur = st.slider(
+                    "Niveau de flou maximum (les clients sélectionnés auront un % aléatoire entre 10% et ce max)",
+                    min_value=10, max_value=100, value=60, format="%d%%"
+                )
+                rng = random.Random(42)  # Seed fixe pour reproductibilité
+                for cid in affected_clients:
+                    blur_config[cid] = rng.randint(10, max_blur)
+                st.markdown("**Aperçu de la partition générée :**")
+                preview_cols = st.columns(min(len(affected_clients), 5))
+                for i, cid in enumerate(affected_clients):
+                    col = preview_cols[i % 5]
+                    pct = blur_config[cid]
+                    emoji = "🟡" if pct <= 30 else ("🟠" if pct <= 70 else "🔴")
+                    col.metric(f"Client {cid}", f"{emoji} {pct}%")
+            else:
+                st.info("Aucun client sélectionné — aucun flou ne sera appliqué.")
+
+        elif blur_mode == "🎛️ Partition arbitraire":
+            st.markdown("**Définissez le niveau de flou pour chaque client :**")
+            st.caption("0% = image nette, 100% = flou maximal. Laissez à 0 pour les clients non dégradés.")
+            cols_per_row = 5
+            client_ids = list(range(clients_number))
+            rows = [client_ids[i:i+cols_per_row] for i in range(0, len(client_ids), cols_per_row)]
+            for row in rows:
+                cols = st.columns(len(row))
+                for col, cid in zip(cols, row):
+                    val = col.number_input(
+                        f"C{cid} (%)",
+                        min_value=0, max_value=100, value=0, step=5,
+                        key=f"arb_blur_client_{cid}"
+                    )
+                    if val > 0:
+                        blur_config[cid] = val
+            if blur_config:
+                st.markdown("**Récapitulatif :**")
+                summary_cols = st.columns(min(len(blur_config), 5))
+                for i, (cid, pct) in enumerate(blur_config.items()):
+                    emoji = "🟡" if pct <= 30 else ("🟠" if pct <= 70 else "🔴")
+                    summary_cols[i % 5].metric(f"Client {cid}", f"{emoji} {pct}%")
+            else:
+                st.info("Tous les clients à 0% — aucun flou ne sera appliqué.")
+
+        st.markdown("#### ⚖️ Hétérogénéité des clients (Quantity Skew)")
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            small_c = st.number_input(
+                "Clients Small (10%)",
+                min_value=0,
+                max_value=clients_number,
+                value=st.session_state.selected_small_clients
+            )
+
+        with c2:
+            medium_c = st.number_input(
+                "Clients Medium (50%)",
+                min_value=0,
+                max_value=clients_number,
+                value=st.session_state.selected_medium_clients
+            )
+
+        with c3:
+            big_c = st.number_input(
+                "Clients Big (100%)",
+                min_value=0,
+                max_value=clients_number,
+                value=st.session_state.selected_big_clients
+            )
+
+        total = small_c + medium_c + big_c
+
+        if total != clients_number:
+            st.error(f"⚠️ Total clients ({total}) ≠ nombre total ({clients_number})")
+        else:
+            st.success("✔ Répartition des clients valide")
         st.markdown("#### Options wandb (facultatif)")
         wandb_mode = "disabled" # Valeurs par défaut pour éviter les erreurs si l'utilisateur ne remplit pas ces champs
         wandb_project = ""
@@ -239,6 +405,49 @@ if st.session_state.etape == 1:
                 
 
         if st.button("🚀 LANCER L'EXPÉRIENCE", width="stretch", type="primary"):
+            if wandb_mode == "online":
+                if not wandb_api_key:
+                    st.error("❌ Erreur : Clé API manquante.")
+                    st.stop()
+                
+                with st.spinner("Test de connexion WandB en cours..."):
+                    try:
+                        # 1. On force l'authentification avec la clé saisie
+                        wandb.login(key=wandb_api_key, relogin=True, force=True)
+                        
+                        # 2. On lance un run de test très court
+                        test_run = wandb.init(
+                            project=wandb_project if wandb_project else "test-connection",
+                            entity=wandb_entity if wandb_entity else None,
+                            name="connection-check",
+                            job_type="test",
+                            reinit=True # Permet de réinitialiser si un run existait déjà
+                        )
+                        
+                        
+                        # 3. On ferme immédiatement le run
+                        test_run.finish()
+                        #Clean up les restes éventuels
+                        if hasattr(wandb, "setup"):
+                            wandb.setup()._teardown()
+                        # --- NETTOYAGE CRUCIAL ---
+                        # On réinitialise les variables d'environnement pour que le 
+                        # prochain run (dans le sous-processus) reparte de zéro
+                        if "WANDB_API_KEY" in os.environ:
+                            del os.environ["WANDB_API_KEY"]
+                        
+                        st.success("✅ Connexion validée !")
+                        
+                    except Exception as e:
+                        # Si le 401 arrive ici, on capture et on bloque
+                        st.error("❌ Échec de l'authentification WandB.")
+                        st.error(f"Détails : {str(e)}")
+                        
+                        # On tente de fermer si c'est resté ouvert
+                        try: wandb.finish()
+                        except: pass
+                        
+                        st.stop() # LE LANCEMENT EST ANNULÉ ICI
             st.session_state.selected_strategy = strategie
             st.session_state.selected_clients = clients_number
             st.session_state.selected_dataset = dataset
@@ -249,12 +458,16 @@ if st.session_state.etape == 1:
             st.session_state.selected_fraction_eval = frac_eval
             st.session_state.selected_alpha = alpha
             st.session_state.selected_self_balancing = self_balancing
+            st.session_state.selected_blur_config = blur_config
             st.session_state.selected_model_name = model_file.name if model_file else "Défaut"
             st.session_state.known_csv_files_before_run = get_all_emission_csvs("emission.csv")
             st.session_state.known_csv_files_before_run_2 = get_all_emission_csvs("EXCEL_emissions_history.csv")
             st.session_state.known_csv_files_before_run_3 = get_all_emission_csvs("EXCEL_eval_emissions_history.csv")
+            st.session_state.selected_small_clients = small_c
+            st.session_state.selected_medium_clients = medium_c
+            st.session_state.selected_big_clients = big_c
             
-            write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing)
+            write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset, img_size, num_channels, num_classes, blur_config)
             
             env = os.environ.copy()
             if wandb_project:
@@ -272,6 +485,16 @@ if st.session_state.etape == 1:
                 cwd=PROJECT_DIR, 
                 env=env
             )
+            global_status["running"] = True
+            global_status["process"] = st.session_state.fl_process
+            global_status["config"] = {
+                "strategy": strategie,
+                "dataset": dataset,
+                "rounds": rounds,
+                "epochs": epochs,
+                "clients": clients_number,
+                "model_name": model_file.name if model_file else "Défaut"
+            }
             st.session_state.etape = 2
             st.rerun()
 
@@ -302,44 +525,38 @@ elif st.session_state.etape == 2:
             st.session_state.current_run_csv = csv
 
     df = read_csv_safely(st.session_state.current_run_csv)
-
-    if df is not None and not df.empty:
-        last = df.iloc[-1]
-        st.subheader("Suivi en direct")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("CPU power", safe_value(last.get("cpu_power"), " W"))
-        m2.metric("GPU power", safe_value(last.get("gpu_power"), " W"))
-        m3.metric("CO₂ émis", safe_value(last.get("emissions"), " kg"))
-        m4.metric("Énergie", safe_value(last.get("energy_consumed"), " kWh"))
-        if len(df) > 1:
-            g1, g2 = st.columns(2)
-            with g1:
-                st.caption("Énergie consommée")
-                st.line_chart(df[["energy_consumed"]])
-            with g2:
-                st.caption("Émissions CO₂")
-                st.line_chart(df[["emissions"]])
-        with st.expander("Voir les données en cours"):
-            st.dataframe(df, width="stretch")
-    else:
-        st.info("Le fichier emission.csv du run courant n'est pas encore disponible.")
-
     st.subheader("État du processus")
     st.write("En cours..." if process_running else "Terminé")
 
     if not process_running and st.session_state.fl_process is not None:
         st.success("Entraînement terminé.")
+        global_status["running"] = False # Reset
+        global_status["process"] = None
         st.session_state.etape = 3
         st.rerun()
 
     col_nav = st.columns([1, 1, 4])
-    if col_nav[0].button("⬅️ Retour"):
-        st.session_state.etape = 1
-        st.rerun()
-    if col_nav[1].button("⏹️ Arrêter", type="secondary"):
+    if col_nav[0].button("⏹️ Arrêter", type="secondary"):
         if st.session_state.fl_process is not None:
-            st.session_state.fl_process.terminate()
-        st.session_state.etape = 3
+            try:
+                # On récupère le processus parent (Flower)
+                parent = psutil.Process(st.session_state.fl_process.pid)
+                
+                # On tue tous les enfants d'abord (les clients, le serveur, etc.)
+                for child in parent.children(recursive=True):
+                    child.terminate()
+                
+                # Puis on tue le parent
+                parent.terminate()
+                
+                st.info("Processus Flower et ses enfants arrêtés.")
+            except psutil.NoSuchProcess:
+                st.warning("Le processus était déjà terminé.")
+            except Exception as e:
+                st.error(f"Erreur lors de l'arrêt : {e}")
+        global_status["running"] = False # Reset ici aussi
+        global_status["process"] = None
+        st.session_state.etape = 1
         st.rerun()
 
     if process_running:

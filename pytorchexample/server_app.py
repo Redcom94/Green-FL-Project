@@ -41,6 +41,10 @@ app = ServerApp()
 def main(grid: Grid, context: Context) -> None:
     # 1. Configuration
     config = context.run_config
+    dataset_name = config.get("dataset-name", "uoft-cs/cifar10")
+    n_cls = context.run_config.get("num-classes", 10)
+    img_size = config.get("img-size", 32)
+    num_channels = config.get("num-channels", 3)
     strategy_name = config.get("strategy", "fedavg").lower()
     num_rounds = config.get("num-server-rounds", 10)
     lr = config.get("learning-rate", 0.01)
@@ -90,7 +94,8 @@ def main(grid: Grid, context: Context) -> None:
     save_path.mkdir(parents=True, exist_ok=True)
     
     strategy.set_save_path(save_path)
-
+    def evaluate_callable(server_round: int, arrays: ArrayRecord) -> MetricRecord:
+        return global_evaluate(server_round, arrays, dataset_name, n_cls, img_size, num_channels)
     # 5. Lancement de l'entraînement avec suivi d'émissions
     tracker = EmissionsTracker(
         project_name=strategy_name,
@@ -115,7 +120,7 @@ def main(grid: Grid, context: Context) -> None:
                 "save_path": str(save_path),
             }),
             num_rounds=num_rounds,
-            evaluate_fn=global_evaluate,
+            evaluate_fn=evaluate_callable,
         )
     finally:
         tracker.stop()
@@ -155,18 +160,16 @@ def main(grid: Grid, context: Context) -> None:
     final_state_dict = result.arrays.to_torch_state_dict()
     torch.save(final_state_dict, save_path / "final_model.pt")
 
-
-def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
+def global_evaluate(server_round: int, arrays: ArrayRecord, dataset_name: str, n_cls:int, img_size:int, num_channels:int) -> MetricRecord:
     """Évaluation globale sur le dataset centralisé."""
     model = Net()
     model.load_state_dict(arrays.to_torch_state_dict())
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
+    test_dataloader = load_centralized_dataset(dataset_name = dataset_name, img_size = img_size, num_channels= num_channels)
+    test_loss, test_acc, test_f1 = test(model, test_dataloader, device, n_cls)
 
-    test_dataloader = load_centralized_dataset()
-    test_loss, test_acc = test(model, test_dataloader, device)
-
-    return MetricRecord({"accuracy": test_acc, "loss": test_loss})
+    return MetricRecord({"accuracy": test_acc, "loss": test_loss, "f1_score":test_f1})
 
 
 def generate_emission_chart(output_path: Path, strategy_name: str):

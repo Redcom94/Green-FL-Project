@@ -139,7 +139,10 @@ class CustomStrategyMixin:
                 if res is not None:
                     result.evaluate_metrics_serverapp[current_round] = res
                     self._update_best_acc(current_round, res["accuracy"], arrays)
-                    wandb.log(dict(res), step=current_round)
+                    
+                    # AJOUTE UN PRÉFIXE ICI POUR WANDB
+                    server_metrics = {f"server/{k}": v for k, v in dict(res).items()}
+                    wandb.log(server_metrics, step=current_round)
 
         log(INFO, "")
         log(INFO, "Strategy execution finished in %.2fs", time.time() - t_start)
@@ -151,7 +154,47 @@ class CustomStrategyMixin:
         log(INFO, "")
 
         return result
-    
+    def aggregate_evaluate(self, current_round: int, results: Iterable[Message]):
+        """Agrège les métriques d'évaluation des clients."""
+        
+        # 1. On récupère l'UNIQUE objet renvoyé par FedAvg
+        agg_metrics = super().aggregate_evaluate(current_round, results)
+
+        # Si personne n'a répondu, on s'arrête
+        if agg_metrics is None:
+            return None
+
+        # 2. Sécurité : Vérifier que c'est bien un MetricRecord
+        if not isinstance(agg_metrics, (dict, MetricRecord)):
+            # Si Flower a renvoyé autre chose (rare), on le transforme
+            agg_metrics = MetricRecord(agg_metrics)
+
+        # 3. Extraction manuelle de la perte (si elle existe dans le record)
+        # La perte est souvent déjà agrégée par FedAvg sous la clé 'loss'
+        agg_loss = agg_metrics.get("loss", 0.0)
+
+        # 4. Calcul de ton F1-Score personnalisé
+        f1_scores = []
+        example_counts = []
+
+        for msg in results:
+            m = msg.content.get("metrics", {})
+            if "eval_f1" in m and "num-examples" in m:
+                f1_scores.append(float(m["eval_f1"]))
+                example_counts.append(int(m["num-examples"]))
+
+        if f1_scores:
+            total_examples = sum(example_counts)
+            if total_examples > 0:
+                weighted_f1 = sum(f * e for f, e in zip(f1_scores, example_counts)) / total_examples
+                
+                log(INFO, "\t└──> [Global Evaluation] Aggregated F1-Score: %.4f", weighted_f1)
+                
+                # On injecte le F1 dans le record existant
+                agg_metrics["f1_score"] = weighted_f1
+
+        # ATTENTION : On renvoie agg_metrics (Flower s'attend à recevoir cet objet unique)
+        return agg_metrics
     """ les strategy fedavg,fedproxy permettent de calculer les moyennes des poids et tous mais ils ignorent complement les nouvelles metriques client_cpu et client_ram"""
     def aggregate_train(self, current_round: int, results: Iterable[Message]):
         """Récupère les poids ET les métriques psutil des clients."""

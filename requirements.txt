@@ -6,3 +6,4 @@ pandas==2.3.3
 git+https://github.com/mlco2/codecarbon.git
 streamlit==1.55.0
 -e .
+torchmetrics==1.9.0

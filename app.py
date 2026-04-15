@@ -10,6 +10,156 @@ import json
 import random
 from pathlib import Path
 import wandb
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+
+def generate_pdf_report(df_res, session_state):
+    """Génère un rapport PDF lisible à partir des données CSV."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=20*mm,
+        rightMargin=20*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm,
+    )
+
+    GREEN = colors.HexColor("#2E7D32")
+    LIGHT_GREEN = colors.HexColor("#E8F5E9")
+    DARK_GRAY = colors.HexColor("#212121")
+    MID_GRAY = colors.HexColor("#616161")
+    LIGHT_GRAY = colors.HexColor("#F5F5F5")
+    BORDER = colors.HexColor("#C8E6C9")
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("title", parent=styles["Normal"],
+        fontSize=22, textColor=GREEN, fontName="Helvetica-Bold",
+        spaceAfter=2*mm, leading=26)
+    subtitle_style = ParagraphStyle("subtitle", parent=styles["Normal"],
+        fontSize=10, textColor=MID_GRAY, fontName="Helvetica",
+        spaceAfter=6*mm)
+    section_style = ParagraphStyle("section", parent=styles["Normal"],
+        fontSize=13, textColor=GREEN, fontName="Helvetica-Bold",
+        spaceBefore=5*mm, spaceAfter=3*mm, borderPad=2,
+        leading=16)
+    label_style = ParagraphStyle("label", parent=styles["Normal"],
+        fontSize=8, textColor=MID_GRAY, fontName="Helvetica", leading=10)
+    value_style = ParagraphStyle("value", parent=styles["Normal"],
+        fontSize=12, textColor=DARK_GRAY, fontName="Helvetica-Bold", leading=14)
+    note_style = ParagraphStyle("note", parent=styles["Normal"],
+        fontSize=8, textColor=MID_GRAY, fontName="Helvetica-Oblique",
+        spaceAfter=4*mm)
+
+    story = []
+
+    # ── Header ──
+    story.append(Paragraph("📊 Rapport Green FL", title_style))
+    from datetime import datetime
+    story.append(Paragraph(f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", subtitle_style))
+    story.append(HRFlowable(width="100%", thickness=2, color=GREEN, spaceAfter=5*mm))
+
+    def metric_table(rows_data):
+        """rows_data: list of (label, value) tuples, displayed in a 4-col grid."""
+        col_w = (A4[0] - 40*mm) / 4
+        cells = []
+        row_labels = []
+        row_values = []
+        for i, (lbl, val) in enumerate(rows_data):
+            row_labels.append(Paragraph(lbl, label_style))
+            row_values.append(Paragraph(str(val), value_style))
+            if (i + 1) % 4 == 0 or i == len(rows_data) - 1:
+                # Pad to 4 cols
+                while len(row_labels) < 4:
+                    row_labels.append(Paragraph("", label_style))
+                    row_values.append(Paragraph("", value_style))
+                cells.append(row_labels)
+                cells.append(row_values)
+                row_labels = []
+                row_values = []
+
+        t = Table(cells, colWidths=[col_w]*4, hAlign="LEFT")
+        style_cmds = [
+            ("BACKGROUND", (0, 0), (-1, -1), LIGHT_GRAY),
+            ("ROWBACKGROUND", (0, 0), (-1, -1), [LIGHT_GRAY, LIGHT_GREEN]),
+            ("BOX", (0, 0), (-1, -1), 0.5, BORDER),
+            ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.white),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]
+        # Alternate bg per pair of rows
+        for r in range(0, len(cells), 2):
+            bg = LIGHT_GREEN if (r // 2) % 2 == 0 else LIGHT_GRAY
+            style_cmds.append(("BACKGROUND", (0, r), (-1, r+1), bg))
+        t.setStyle(TableStyle(style_cmds))
+        return t
+
+    last = df_res.iloc[-1]
+
+    # ── Section 1 : Configuration ──
+    story.append(Paragraph("⚙️ Configuration demandée", section_style))
+    config_data = [
+        ("Stratégie", session_state.get("selected_strategy", "N/A")),
+        ("Dataset", session_state.get("selected_dataset", "N/A")),
+        ("Rounds", session_state.get("selected_rounds", "N/A")),
+        ("Epochs", session_state.get("selected_epochs", "N/A")),
+        ("Clients", session_state.get("selected_clients", "N/A")),
+        ("Learning Rate", session_state.get("selected_lr", "N/A")),
+        ("Modèle", session_state.get("selected_model_name", "Défaut")),
+    ]
+    story.append(metric_table(config_data))
+    story.append(Spacer(1, 5*mm))
+
+    # ── Section 2 : Résumé Environnemental ──
+    story.append(Paragraph("🌿 Résumé Environnemental", section_style))
+    env_data = [
+        ("CO<sub rise='2' size='7'>2</sub> émis (kg)", safe_value(last.get("emissions"), "")),
+        ("Énergie consommée (kWh)", safe_value(last.get("energy_consumed"), "")),
+        ("Durée (s)", safe_value(last.get("duration"), "")),
+        ("Taux d'émission (kg/s)", safe_value(last.get("emissions_rate"), "")),
+        ("CPU power (W)", safe_value(last.get("cpu_power"), "")),
+        ("GPU power (W)", safe_value(last.get("gpu_power"), "")),
+        ("RAM power (W)", safe_value(last.get("ram_power"), "")),
+        ("Eau consommée (L)", safe_value(last.get("water_consumed"), "")),
+    ]
+    story.append(metric_table(env_data))
+    story.append(Spacer(1, 5*mm))
+
+    # ── Section 3 : Expérience & Machine ──
+    story.append(Paragraph("🧪 Expérience & Machine", section_style))
+    exp_data = [
+        ("Projet", safe_value(last.get("project_name"))),
+        ("Run ID", safe_value(last.get("run_id"))),
+        ("Experiment ID", safe_value(last.get("experiment_id"))),
+        ("Mode", safe_value(last.get("tracking_mode"))),
+        ("PUE", safe_value(last.get("pue"))),
+        ("WUE", safe_value(last.get("wue"))),
+        ("OS", safe_value(last.get("os"))),
+        ("Python", safe_value(last.get("python_version"))),
+        ("CPU", safe_value(last.get("cpu_model"))),
+        ("CPU count", safe_value(last.get("cpu_count"))),
+        ("GPU", safe_value(last.get("gpu_model"))),
+        ("GPU count", safe_value(last.get("gpu_count"))),
+    ]
+    story.append(metric_table(exp_data))
+    story.append(Spacer(1, 5*mm))
+
+    story.append(Spacer(1, 8*mm))
+    story.append(HRFlowable(width="100%", thickness=1, color=BORDER))
+    story.append(Paragraph("Green FL Platform — Rapport généré automatiquement", note_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.read()
 
 OPTIM_TIPS = {
     "FedAvg": " **Optimisation Green** : Idéal pour limiter la communication. Activez l'Early Stopping local pour économiser du CPU sur les clients qui convergent vite.",
@@ -648,11 +798,15 @@ elif st.session_state.etape == 3:
 
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
-        csv_1, csv_2, csv_3 = st.columns(3)
+        csv_1, csv_2, csv_3, csv_4 = st.columns(4)
         with csv_1:
             st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                                file_name="emission.csv", mime="text/csv")
         with csv_2:
+            pdf_bytes = generate_pdf_report(df_res, st.session_state)
+            st.download_button("📄 Télécharger PDF", data=pdf_bytes,
+                               file_name="rapport_green_fl.pdf", mime="application/pdf")
+        with csv_3:
             path_hist = get_latest_csv("EXCEL_emissions_history.csv")
             if path_hist:
                 df_hist = pd.read_csv(path_hist, sep=';')
@@ -663,7 +817,7 @@ elif st.session_state.etape == 3:
                 st.info("Historique non dispo.")
 
         # 3. Le rapport d'évaluation
-        with csv_3:
+        with csv_4:
             path_eval = get_latest_csv("EXCEL_eval_emissions_history.csv")
             if path_eval:
                 df_eval = pd.read_csv(path_eval, sep=';')

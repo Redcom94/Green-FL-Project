@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=FL_Distributed
-#SBATCH --nodes=3                # 1 Serveur + 2 Clients
+#SBATCH --nodes=3                # 1 Serveur + 2 Clients (minimum)
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G

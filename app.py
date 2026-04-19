@@ -798,7 +798,7 @@ elif st.session_state.etape == 3:
 
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
-        csv_1, csv_2, csv_3, csv_4 = st.columns(4)
+        csv_1, csv_2, csv_3, csv_4, csv_5 = st.columns(5)
         with csv_1:
             st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                                file_name="emission.csv", mime="text/csv")
@@ -826,6 +826,18 @@ elif st.session_state.etape == 3:
                                    file_name="evaluation.csv", mime="text/csv")
             else:
                 st.info("Éval non dispo.")
+        with csv_5:
+            file_path = PROJECT_DIR /"Etat_de_l_art_green_FL.pdf"
+            if file_path.exists():
+                with open(file_path, "rb") as f:
+                    st.download_button(
+                        "📘 État de l'art",
+                        data=f,
+                        file_name="Etat_de_l_art_green_FL.pdf",
+                        mime="application/pdf"
+                    )
+            else:
+                st.info("Fichier État de l'art non trouvé.")
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")
 

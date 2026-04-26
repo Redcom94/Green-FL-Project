@@ -628,10 +628,10 @@ if st.session_state.etape == 1:
                 env["WANDB_API_KEY"] = wandb_api_key
             if wandb_entity:
                 env["WANDB_ENTITY"] = wandb_entity
-
+            num_clients_str = str(st.session_state.selected_clients)
             # Lancement du processus avec le nouvel environnement
             st.session_state.fl_process = subprocess.Popen(
-                ["flwr", "run", "."], 
+                ["bash", "local_test_run.sh", num_clients_str], 
                 cwd=PROJECT_DIR, 
                 env=env
             )

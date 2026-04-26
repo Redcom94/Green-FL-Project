@@ -798,7 +798,7 @@ elif st.session_state.etape == 3:
 
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
-        csv_1, csv_2, csv_3, csv_4, csv_5 = st.columns(5)
+        csv_1, csv_2, csv_3, csv_4, csv_5, fichier_txt = st.columns(6)
         with csv_1:
             st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
                                file_name="emission.csv", mime="text/csv")
@@ -838,6 +838,21 @@ elif st.session_state.etape == 3:
                     )
             else:
                 st.info("Fichier État de l'art non trouvé.")
+        with fichier_txt:
+            path_txt = get_latest_csv("grid_context.json")
+            if path_txt and path_txt.exists():
+                with open(path_txt, "r", encoding="utf-8") as f:
+                    json_data = f.read()
+                st.download_button(
+                    "📥 Télécharger consommation énergétique", 
+                    data=json_data,
+                    file_name="grid_context.txt", 
+                    mime="application/json"
+                )
+            else:
+                st.info("Consommation énergétique non dispo.")
+            
+
     else:
         st.warning("Aucun fichier emission.csv exploitable trouvé.")
 

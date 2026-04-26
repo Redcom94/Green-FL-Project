@@ -37,8 +37,65 @@ STRATEGIES = {
 
 app = ServerApp()
 
+import requests
+
+def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
+    """cette fonction sert a recuperer l'intensite en temps reel via electricite maps 
+    pour cette partie j'ai travaillr avec cloud ia"""
+    try:
+        r1 = requests.get(
+            f"https://api.electricitymap.org/v3/carbon-intensity/latest?zone={zone}",
+            headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
+            timeout=5
+        )
+        r2 = requests.get(
+            f"https://api.electricitymap.org/v3/power-breakdown/latest?zone={zone}",
+            headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
+            timeout=5
+        )
+
+
+        d1=r1.json()
+        d2=r2.json()
+
+
+
+
+        
+        return {
+            "zone": zone,
+            "realtime_carbon_intensity": d1.get("carbonIntensity"),
+            "datetime": d1.get("datetime"),
+            "fossil_free_percentage": d2.get("fossilFreePercentage"),
+            # NOUVEAUX CHAMPS
+            "renewable_percentage":    d2.get("renewablePercentage"),
+            "nuclear_mw":   d2.get("powerConsumptionBreakdown", {}).get("nuclear"),
+            "wind_mw":      d2.get("powerConsumptionBreakdown", {}).get("wind"),
+            "solar_mw":     d2.get("powerConsumptionBreakdown", {}).get("solar"),
+            "gas_mw":       d2.get("powerConsumptionBreakdown", {}).get("gas"),
+            "coal_mw":      d2.get("powerConsumptionBreakdown", {}).get("coal"),
+        }
+    except Exception as e:
+        print(f"⚠️ Electricity Maps indisponible : {e}")
+        return {"realtime_carbon_intensity": None}
+
+
+
+
+
 @app.main()
 def main(grid: Grid, context: Context) -> None:
+
+    """ j'ajoute ce petite script afin de forcer la detection du gpu , car dans certaines ordinateur comme le mien on trouve des gpu intégre avec cpu et pas isoler 
+    exemple : intel R iris R xe graphics . ce qui  explique aussi  pourquoi avant on avait tjr 0 watts comme consommation de gpu (alorque que sa consommation reel etait compte comme cpu) mais des qu'on a inclu les cluster on a arrivé a separer le gpu et cpu 
+    """
+    if torch.cuda.is_available():
+        device_type="GPU(NVIDIA)"
+        gpu_name=torch.cuda.get_device_name(0)
+        print(f"le gpu detecté est : {gpu_name}")
+    else:
+        print("aucun gpu nvidia n'est detecté. il y a juste la presence de cpu et gpu integré ")
+        print("la consommation du gpu sera incluse dans ' cpu_energy'  ")
     # 1. Configuration
     config = context.run_config
     dataset_name = config.get("dataset-name", "uoft-cs/cifar10")
@@ -103,7 +160,18 @@ def main(grid: Grid, context: Context) -> None:
         output_file="emission.csv",
         measure_power_secs=15
     )
+
+    # ⚡ Snapshot Electricity Maps avant l'entraînement
+    em_before = get_carbon_intensity_realtime(zone="BE")
+    if em_before["realtime_carbon_intensity"]:
+        print(f"⚡ Intensité carbone réseau : {em_before['realtime_carbon_intensity']} gCO2eq/kWh")
+        print(f"🌿 Énergie fossile-free : {em_before.get('fossil_free_percentage', 'N/A')}%")
     
+    import json
+    with open(save_path / "grid_context.json", "w") as f:
+        json.dump(em_before, f, indent=2)
+
+
     tracker.start()
     try:
         print(f"🚀 Starting Federated Learning: {strategy_name.upper()}")
@@ -124,7 +192,68 @@ def main(grid: Grid, context: Context) -> None:
         )
     finally:
         tracker.stop()
+        #  Snapshot Electricity Maps après l'entraînement + comparaison
+        em_after = get_carbon_intensity_realtime(zone="BE")
         
+        if em_before["realtime_carbon_intensity"] and em_after["realtime_carbon_intensity"]:
+            intensity_avg = (
+                em_before["realtime_carbon_intensity"] + 
+                em_after["realtime_carbon_intensity"]
+            ) / 2
+            
+            # Lire l'énergie totale consommée depuis le CSV CodeCarbon
+            emission_csv = save_path / "emission.csv"
+            if emission_csv.exists():
+                df_em = pd.read_csv(emission_csv)
+                if "energy_consumed" in df_em.columns:
+                    energy_kwh = pd.to_numeric(
+                        df_em["energy_consumed"].astype(str).str.replace(',', '.'), 
+                        errors='coerce'
+                    ).sum()
+                    
+                    codecarbon_co2  = pd.to_numeric(
+                        df_em["emissions"].astype(str).str.replace(',', '.'), 
+                        errors='coerce'
+                    ).sum()
+                    
+                    realtime_co2 = energy_kwh * (intensity_avg / 1000)  # kg CO2
+                    
+                    diff_pct = (
+                        abs(realtime_co2 - codecarbon_co2) / codecarbon_co2 * 100
+                        if codecarbon_co2 > 0 else 0
+                    )
+                    
+                    print(f"\n📊 Comparaison émissions CO2 :")
+                    print(f"   CodeCarbon  : {codecarbon_co2:.6f} kg CO2")
+                    print(f"   ElectricityMaps : {realtime_co2:.6f} kg CO2")
+                    print(f"   Écart       : {diff_pct:.1f}%")
+                    
+                    # Sauvegarder la comparaison
+                    comparison = {
+                        "strategy": strategy_name,
+                        "zone": "BE",
+                        "intensity_before_gco2_kwh": em_before["realtime_carbon_intensity"],
+                        "intensity_after_gco2_kwh":  em_after["realtime_carbon_intensity"],
+                        "intensity_avg_gco2_kwh":    intensity_avg,
+                        "energy_consumed_kwh":        energy_kwh,
+                        "codecarbon_kg_co2":          codecarbon_co2,
+                        "electricitymaps_kg_co2":     realtime_co2,
+                        "difference_percent":         diff_pct,
+                        "datetime_start":             em_before.get("datetime"),
+                        "datetime_end":               em_after.get("datetime"),
+                    }
+                    with open(save_path / "em_comparison.json", "w") as f:
+                        json.dump(comparison, f, indent=2)
+                    print(f"   💾 Sauvegardé dans : em_comparison.json")
+
+
+
+
+
+
+
+
+
         # --- CORRECTION DES DÉCIMALES ET FORMATS CSV ---
         print("\n🔄 Harmonisation des fichiers CSV pour Excel FR...")
         fichiers_csv = list(save_path.glob("*.csv"))

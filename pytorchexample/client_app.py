@@ -19,6 +19,29 @@ from pytorchexample.task import load_data
 from pytorchexample.task import test as test_fn
 from pytorchexample.task import train as train_fn
 
+
+
+
+import requests
+
+def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
+    """Récupère l'intensité carbone en temps réel via Electricity Maps."""
+    try:
+        response = requests.get(
+            f"https://api.electricitymap.org/v3/carbon-intensity/latest?zone={zone}",
+            headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
+            timeout=5
+        )
+        data = response.json()
+        return {
+            "zone": zone,
+            "realtime_carbon_intensity": data.get("carbonIntensity"),
+            "datetime": data.get("datetime"),
+        }
+    except Exception as e:
+        print(f"⚠️ Electricity Maps indisponible : {e}")
+        return {"realtime_carbon_intensity": None}
+
 # --- Fonction Utilitaire pour corriger le format CSV (Point vers Virgule) ---
 def harmoniser_csv_format(file_path: Path):
     """
@@ -36,6 +59,10 @@ def harmoniser_csv_format(file_path: Path):
             print(f"✅ Version Excel générée : {excel_path.name}")
     except Exception as e:
         print(f"⚠️ Impossible de convertir {file_path.name} : {e}")
+
+
+
+
 
 # Flower ClientApp
 app = ClientApp()
@@ -103,17 +130,36 @@ def train(msg: Message, context: Context):
         if not file_exists:
             writer.writerow(["Execution_No", "Strategy", "Round", "id_client", "POURCENTAGE_CPU", "POURCENTAGE_RAM"])
         writer.writerow([run_id, strategy_name, msg.metadata.group_id, partition_id, cpu_usage, ram_info.percent])
+    
+    gpu_disponible = torch.cuda.is_available()
+    nom_gpu = torch.cuda.get_device_name(0) if gpu_disponible else "Aucun (Mode CPU/Intégré)"
+    
+    print(f"🖥️  Client {partition_id} utilise : {nom_gpu}")
+    if not gpu_disponible:
+        print("⚠️  Avis : Les mesures 'gpu_energy' seront à 0 sur ce matériel (Intel Iris Xe).")
+
+    # Modification du project_name pour inclure l'info matériel
+    suffixe_materiel = "GPU" if gpu_disponible else "CPU"
+
+
+
+
 
     # 5. Entraînement avec CodeCarbon
     emissions_file = "emissions_history.csv"
     tracker = EmissionsTracker(
-        project_name=f"client_{partition_id}_round_{current_round}_train",
+        project_name=f"client_{partition_id}_round_{current_round}_{suffixe_materiel}_train",
+        
         output_dir=str(save_path),
         output_file=emissions_file, 
         on_csv_write="append",
         measure_power_secs=1
     )
-    
+    # ⚡ Snapshot Electricity Maps avant le round
+    em_snapshot = get_carbon_intensity_realtime(zone="BE")
+    if em_snapshot["realtime_carbon_intensity"]:
+        print(f"⚡ [Client {partition_id}] Intensité réseau : "
+              f"{em_snapshot['realtime_carbon_intensity']} gCO2eq/kWh")
     tracker.start()
     try:
         train_loss = train_fn(
@@ -126,6 +172,25 @@ def train(msg: Message, context: Context):
     finally:        
         tracker.stop()
         harmoniser_csv_format(save_path / emissions_file)
+        # ⚡ Log Electricity Maps dans client_stats.csv
+        em_intensity = em_snapshot.get("realtime_carbon_intensity")
+        if em_intensity:
+            log_em_file = save_path / "client_em_intensity.csv"
+            file_exists_em = log_em_file.exists()
+            with open(log_em_file, "a", newline="") as f:
+                writer = csv.writer(f, delimiter=';')
+                if not file_exists_em:
+                    writer.writerow([
+                        "Round", "Client_ID", "Strategy", 
+                        "EM_Intensity_gCO2_kWh", "Datetime_EM"
+                    ])
+                writer.writerow([
+                    msg.metadata.group_id,
+                    partition_id,
+                    strategy_name,
+                    str(em_intensity).replace('.', ','),  # format FR
+                    em_snapshot.get("datetime", "N/A")
+                ])
 
     # 6. Retour des résultats
     model_record = ArrayRecord(model.state_dict())
@@ -181,6 +246,20 @@ def evaluate(msg: Message, context: Context):
         small_client, medium_client, big_client, 
         dataset_name, img_size, num_channels, alpha, self_balancing, blur_percent
     )
+
+
+
+    gpu_disponible = torch.cuda.is_available()
+    nom_gpu = torch.cuda.get_device_name(0) if gpu_disponible else "Aucun (Mode CPU/Intégré)"
+    
+    print(f"🖥️  Client {partition_id} utilise : {nom_gpu}")
+    if not gpu_disponible:
+        print("⚠️  Avis : Les mesures 'gpu_energy' seront à 0 sur ce matériel (Intel Iris Xe).")
+
+    # Modification du project_name pour inclure l'info matériel
+    suffixe_materiel = "GPU" if gpu_disponible else "CPU"
+
+
 
     # 4. CodeCarbon
     eval_emissions_file = "eval_emissions_history.csv"

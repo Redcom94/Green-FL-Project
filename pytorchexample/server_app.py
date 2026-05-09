@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import csv
-
+import os
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 
@@ -25,7 +25,7 @@ except ImportError:
     from pytorchexample.model import Net       # Modèle par défaut
 
 from codecarbon import EmissionsTracker
-
+ENERGY_PER_GB = 0.06
 # Dictionnaire de correspondance des stratégies
 STRATEGIES = {
     "fedavg": CustomFedAvg,
@@ -40,8 +40,7 @@ app = ServerApp()
 import requests
 
 def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
-    """cette fonction sert a recuperer l'intensite en temps reel via electricite maps 
-    pour cette partie j'ai travaillr avec cloud ia"""
+    """cette fonction sert a recuperer l'intensite en temps reel via electricite maps """
     try:
         r1 = requests.get(
             f"https://api.electricitymap.org/v3/carbon-intensity/latest?zone={zone}",
@@ -79,7 +78,19 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
         print(f"⚠️ Electricity Maps indisponible : {e}")
         return {"realtime_carbon_intensity": None}
 
+def estimate_network_cost(model, num_rounds, clients_per_round):
+    """Calcule le coût énergétique théorique du réseau."""
+    # Sauvegarde temporaire pour mesurer la taille réelle
+    torch.save(model.state_dict(), "temp_size.pt")
+    model_size_gb = os.path.getsize("temp_size.pt") / (1024**3)
+    os.remove("temp_size.pt")
 
+    # Total Data = (Model_Size * Clients * Rounds * 2) 
+    # Le * 2 compte l'aller (Download) et le retour (Upload)
+    total_data_gb = model_size_gb * clients_per_round * num_rounds * 2
+    network_energy_kwh = total_data_gb * ENERGY_PER_GB
+    
+    return total_data_gb, network_energy_kwh
 
 
 
@@ -227,7 +238,11 @@ def main(grid: Grid, context: Context) -> None:
                     print(f"   CodeCarbon  : {codecarbon_co2:.6f} kg CO2")
                     print(f"   ElectricityMaps : {realtime_co2:.6f} kg CO2")
                     print(f"   Écart       : {diff_pct:.1f}%")
-                    
+                    total_gb, net_kwh = estimate_network_cost(
+                        global_model, 
+                        num_rounds, 
+                        int(min_available_nodes * fraction_train)
+                    )
                     # Sauvegarder la comparaison
                     comparison = {
                         "strategy": strategy_name,
@@ -241,6 +256,9 @@ def main(grid: Grid, context: Context) -> None:
                         "difference_percent":         diff_pct,
                         "datetime_start":             em_before.get("datetime"),
                         "datetime_end":               em_after.get("datetime"),
+                        "network_transfer_gb" : total_gb,
+                        "network_energy_kwh" : net_kwh,
+                        "total_combined_energy_kwh" : energy_kwh + net_kwh
                     }
                     with open(save_path / "em_comparison.json", "w") as f:
                         json.dump(comparison, f, indent=2)
@@ -336,3 +354,4 @@ def generate_emission_chart(output_path: Path, strategy_name: str):
             print(f" 📊 Graphique sauvegardé dans : {output_path}")
         except Exception as e:
             print(f" ⚠️ Erreur graphique : {e}")
+

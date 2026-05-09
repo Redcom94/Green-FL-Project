@@ -1,0 +1,16 @@
+services:
+  green-fl-platform:
+    build: .
+    container_name: green_fl_app
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app         # Sauvegarde vos CSV/PDF sur votre PC et permet d'injecter les modèles
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

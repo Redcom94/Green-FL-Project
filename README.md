@@ -2,15 +2,17 @@
 ## Set up the project
 ### Install dependencies and project
 
-Install the dependencies defined in `requirements.txt` as well as the `pyproject.toml` file.
-Use Python 3.13.5
+This branch is if you'd rather use Docker images rather than a virtual environment. 
+Make sure docker has acccess to NVIDIA GPU
+```bash
+sudo apt-get install -y nvidia-container-toolkit
+```
+```bash
+sudo systemctl restart docker
+```
+## Build and launch the docker Image
 
 ```bash
-pip install -r requirements.txt
+sudo docker-compose up --build
 ```
-
-## Run the project
-
-```bash
-streamlit run app.py
-```
+After that, open localhost:8501.

@@ -81,8 +81,9 @@ def train(msg: Message, context: Context):
 
     # 1. Chargement du modèle
     model = Net()
+    num_gpus = context.run_config["num-gpus"]
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() and num_gpus == 1 else "cpu")
     model.to(device)
     
     current_round = msg.content["config"].get("server_round", 0)

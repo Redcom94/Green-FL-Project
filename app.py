@@ -17,7 +17,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-
+ENERGY_PER_GB = 0.06
 def generate_pdf_report(df_res, session_state):
     """Génère un rapport PDF lisible à partir des données CSV."""
     buffer = io.BytesIO()
@@ -118,8 +118,25 @@ def generate_pdf_report(df_res, session_state):
     ]
     story.append(metric_table(config_data))
     story.append(Spacer(1, 5*mm))
+# --- Section 2 : Coût Réseau ---
+    path_comp = get_latest_csv("em_comparison.json")
+    if path_comp and path_comp.exists():
+        with open(path_comp, "r") as f:
+            comp_data = json.load(f) 
+            
+        story.append(Paragraph("🌐 Analyse du Coût Réseau", section_style))
+        story.append(Paragraph(f"Estimation basée sur l'intensité du transport de données ({ENERGY_PER_GB} kWh/GB).", note_style))
+        network_metrics = [
+            ("Volume (GB)", f"{comp_data.get('network_transfer_gb', 0):.4f} GB"),
+            ("Énergie Réseau", f"{comp_data.get('network_energy_kwh', 0):.6f} kWh"),
+            ("Total Combiné", f"{comp_data.get('total_combined_energy_kwh', 0):.6f} kWh"),
+            ("Source", "Shift Project / IEA"),
+        ]
+    
+        story.append(metric_table(network_metrics))
+        story.append(Spacer(1, 5*mm))
 
-    # ── Section 2 : Résumé Environnemental ──
+    # ── Section 3 : Résumé Environnemental ──
     story.append(Paragraph("🌿 Résumé Environnemental", section_style))
     env_data = [
         ("CO<sub rise='2' size='7'>2</sub> émis (kg)", safe_value(last.get("emissions"), "")),
@@ -134,7 +151,7 @@ def generate_pdf_report(df_res, session_state):
     story.append(metric_table(env_data))
     story.append(Spacer(1, 5*mm))
 
-    # ── Section 3 : Expérience & Machine ──
+    # ── Section 4 : Expérience & Machine ──
     story.append(Paragraph("🧪 Expérience & Machine", section_style))
     exp_data = [
         ("Projet", safe_value(last.get("project_name"))),
@@ -195,6 +212,7 @@ for key, default in [
     ("selected_small_clients", 0),
     ("selected_medium_clients", 0),
     ("selected_big_clients", 0),
+    ("use_gpu", True)
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -242,7 +260,7 @@ def read_csv_safely(path):
     try: return pd.read_csv(path, sep=';')
     except: return None
 
-def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
+def write_pyproject_with_config(num_gpus,strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
     # --- 1. Mise à jour de pyproject.toml ---
     pyproject_path = PROJECT_DIR / "pyproject.toml"
     pyproject_data = toml.load(pyproject_path)
@@ -265,6 +283,7 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
     cfg["small-clients"] = small_c
     cfg["medium-clients"] = medium_c
     cfg["big-clients"] = big_c
+    cfg["num-gpus"] = num_gpus
     
     # blur_config : dict {client_id -> blur_percent}, sérialisé en JSON string pour pyproject.toml
     cfg["blur-config"] = json.dumps({str(k): v for k, v in (blur_config or {}).items()})
@@ -291,7 +310,10 @@ def write_pyproject_with_config(strategy, rounds, epochs, lr, f_train, f_eval, n
                 if "options" not in local_section:
                     local_section["options"] = {}
                 local_section["options"]["num-supernodes"] = num_clients
-                
+                local_section2 = data_global["superlink"]["local"]["options"]["backend"]
+                if "client-resources" not in local_section2:
+                    local_section2["client-resources"] = {}
+                local_section2["client-resources"]["num-gpus"] = num_gpus            
                 with open(flwr_global_config, "w") as f:
                     toml.dump(data_global, f)
                     
@@ -321,6 +343,12 @@ if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
         st.markdown("### 🛠️ Étape 1 : Configuration")
+        st.markdown("🖥️ Ressources Matérielles")
+        option_gpu = st.checkbox("Activer l'accélération GPU", value=True)
+        if option_gpu == True:
+            num_gpus = 1.0
+        else:
+            num_gpus = 0.0
         st.divider()
 
         col_m, col_d, col_p = st.columns(3)
@@ -617,7 +645,7 @@ if st.session_state.etape == 1:
             st.session_state.selected_medium_clients = medium_c
             st.session_state.selected_big_clients = big_c
             
-            write_pyproject_with_config(strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset, img_size, num_channels, num_classes, blur_config)
+            write_pyproject_with_config(num_gpus,strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset, img_size, num_channels, num_classes, blur_config)
             
             env = os.environ.copy()
             if wandb_project:
@@ -795,6 +823,24 @@ elif st.session_state.etape == 3:
             with g2:
                 st.caption("Émissions CO₂")
                 st.line_chart(df_res[["emissions"]])
+        path_comp = get_latest_csv("em_comparison.json")
+        if path_comp and path_comp.exists():
+            with open(path_comp, "r") as f:
+                comp_data = json.load(f)
+            
+            st.subheader("🌐 Impact Réseau & Global")
+            
+            # Création de 3 colonnes pour le réseau
+            c1, c2, c3 = st.columns(3)
+            
+            with c1:
+                st.metric("Volume Transféré", f"{comp_data.get('network_transfer_gb', 0):.4f} GB")
+            with c2:
+                st.metric("Énergie Réseau", f"{comp_data.get('network_energy_kwh', 0):.6f} kWh", help="Basé sur 0.06 kWh/GB")
+            with c3:
+                # On affiche le total combiné (Matériel + Réseau)
+                total_kwh = comp_data.get('total_combined_energy_kwh', 0)
+                st.metric("Consommation Totale", f"{total_kwh:.6f} kWh")
 
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")
@@ -839,18 +885,41 @@ elif st.session_state.etape == 3:
             else:
                 st.info("Fichier État de l'art non trouvé.")
         with fichier_txt:
-            path_txt = get_latest_csv("grid_context.json")
-            if path_txt and path_txt.exists():
-                with open(path_txt, "r", encoding="utf-8") as f:
-                    json_data = f.read()
+            st.markdown("##### 📄 Données JSON")
+            
+            # --- 1. FICHIER GRID CONTEXT (Initial) ---
+            path_grid = get_latest_csv("grid_context.json")
+            if path_grid and path_grid.exists():
+                with open(path_grid, "r", encoding="utf-8") as f:
+                    grid_data = f.read()
                 st.download_button(
-                    "📥 Télécharger consommation énergétique", 
-                    data=json_data,
-                    file_name="grid_context.txt", 
-                    mime="application/json"
+                    label="📥 Grid Context (Initial)",
+                    data=grid_data,
+                    file_name="grid_context_initial.json",
+                    mime="application/json",
+                    use_container_width=True
                 )
-            else:
-                st.info("Consommation énergétique non dispo.")
+            
+            # --- 2. FICHIER BILAN COMPLET (Comparaison + Réseau) ---
+            path_comp = get_latest_csv("em_comparison.json")
+            if path_comp and path_comp.exists():
+                with open(path_comp, "r", encoding="utf-8") as f:
+                    comp_data = json.load(f)
+                
+                # Petit rappel visuel des métriques réseau avant le bouton
+                st.info(f"🌐 Réseau : {comp_data.get('network_transfer_gb', 0):.4f} GB")
+                
+                json_string = json.dumps(comp_data, indent=2)
+                st.download_button(
+                    label="📊 Bilan Complet (Final)", 
+                    data=json_string,
+                    file_name=f"bilan_global_{st.session_state.get('strategy', 'fl')}.json", 
+                    mime="application/json",
+                    use_container_width=True
+                )
+            
+            if not path_grid and not path_comp:
+                st.info("Aucune donnée JSON disponible.")
             
 
     else:

@@ -260,7 +260,7 @@ def read_csv_safely(path):
     try: return pd.read_csv(path, sep=';')
     except: return None
 
-def write_pyproject_with_config(num_gpus,strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
+def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
     # --- 1. Mise à jour de pyproject.toml ---
     pyproject_path = PROJECT_DIR / "pyproject.toml"
     pyproject_data = toml.load(pyproject_path)
@@ -284,6 +284,7 @@ def write_pyproject_with_config(num_gpus,strategy, rounds, epochs, lr, f_train, 
     cfg["medium-clients"] = medium_c
     cfg["big-clients"] = big_c
     cfg["num-gpus"] = num_gpus
+    cfg["batch-size"] = batch_size
     
     # blur_config : dict {client_id -> blur_percent}, sérialisé en JSON string pour pyproject.toml
     cfg["blur-config"] = json.dumps({str(k): v for k, v in (blur_config or {}).items()})
@@ -427,7 +428,7 @@ if st.session_state.etape == 1:
             st.info("💡 **Focus FedAdagrad** : Idéal si vos clients ont des données très spécifiques (ex: imagerie médicale rare) car elle adapte le pas d'apprentissage à la rareté des features.")
         st.write("")      
         st.markdown("#### 🚀 Hyperparamètres de base")
-        c_s, c_r, c_e, c_l = st.columns(4)
+        c_s, c_r, c_e, c_l, c_br = st.columns(5)
         with c_s:
             strategie = st.selectbox("Stratégie", ["FedAvg", "FedProx", "FedAdam", "FedYogi", "FedAdagrad"])
         with c_r:
@@ -436,6 +437,8 @@ if st.session_state.etape == 1:
             epochs = st.selectbox("Epochs locales", [1, 2, 3])
         with c_l:
             lr = st.number_input("Learning Rate", min_value=0.0001, value=0.01, format="%.4f")
+        with c_br:
+            batch_size = st.number_input("Batch Size", min_value = 2, value = 32)
         st.info(OPTIM_TIPS.get(strategie, "Sélectionnez une stratégie."))
         st.markdown("#### ⚖️ Sélection des clients")
         clients_number = st.slider("Nombre de clients", 2, 100, st.session_state.selected_clients, help="Nombre de clients")
@@ -645,7 +648,7 @@ if st.session_state.etape == 1:
             st.session_state.selected_medium_clients = medium_c
             st.session_state.selected_big_clients = big_c
             
-            write_pyproject_with_config(num_gpus,strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset, img_size, num_channels, num_classes, blur_config)
+            write_pyproject_with_config(batch_size, num_gpus,strategie, rounds, epochs, lr, frac_train, frac_eval, clients_number, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset, img_size, num_channels, num_classes, blur_config)
             
             env = os.environ.copy()
             if wandb_project:

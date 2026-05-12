@@ -18,6 +18,17 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 ENERGY_PER_GB = 0.06
+def read_accuracy_value(output_path):
+    """Lit la dernière précision sauvegardée par le serveur."""
+    acc_file = output_path / "last_accuracy.txt"
+    if acc_file.exists():
+        try:
+            with open(acc_file, "r") as f:
+                content = f.read().strip()
+                return float(content)
+        except:
+            return None
+    return None
 def list_outputs_files(directory):
     """Liste tous les fichiers dans le dossier outputs avec leurs métadonnées."""
     file_list = []
@@ -35,11 +46,13 @@ def list_outputs_files(directory):
                 })
     # Trier du plus récent au plus ancien
     return sorted(file_list, key=lambda x: x['mtime'], reverse=True)
-def generate_pdf_report(df_res, session_state):
+def generate_pdf_report(df_res, session_state, save_path = None):
     """Génère un rapport PDF lisible à partir des données CSV."""
     buffer = io.BytesIO()
+    # Si save_path est fourni, on utilise le chemin, sinon le buffer mémoire
+    target = save_path if save_path else buffer
     doc = SimpleDocTemplate(
-        buffer,
+        target,
         pagesize=A4,
         leftMargin=20*mm,
         rightMargin=20*mm,
@@ -190,9 +203,13 @@ def generate_pdf_report(df_res, session_state):
     story.append(Spacer(1, 8*mm))
     story.append(HRFlowable(width="100%", thickness=1, color=BORDER))
     story.append(Paragraph("Green FL Platform — Rapport généré automatiquement", note_style))
-
     doc.build(story)
-    buffer.seek(0)
+    
+    if save_path:
+        return None # Le fichier est déjà écrit sur le disque
+    else:
+        buffer.seek(0)
+        return buffer.read()
     return buffer.read()
 
 OPTIM_TIPS = {
@@ -395,8 +412,8 @@ with st.sidebar:
                 # ==============================
                 ext_filter = st.multiselect(
                     "Filtrer par type",
-                    options=[".csv", ".json", ".pdf"],
-                    default=[".csv", ".json", ".pdf"]
+                    options=[".csv", ".json", ".pdf", ".png"],
+                    default=[".csv", ".json", ".pdf", ".png"]
                 )
 
                 # ==============================
@@ -864,6 +881,10 @@ elif st.session_state.etape == 2:
 
     if not process_running and st.session_state.fl_process is not None:
         st.success("Entraînement terminé.")
+        global_status["running"] = False 
+        global_status["process"] = None
+        st.session_state.etape = 3
+        st.rerun()
         global_status["running"] = False # Reset
         global_status["process"] = None
         st.session_state.etape = 3
@@ -904,11 +925,28 @@ elif st.session_state.etape == 2:
 elif st.session_state.etape == 3:
 
     st.title("📊 Étape 3 : Résultats finaux")
-    st.divider()
-
-    csv_path = st.session_state.current_run_csv or get_latest_csv("emission.csv")
+    csv_path = st.session_state.get('current_run_csv') or get_latest_csv("emission.csv")
+    
+    if csv_path:
+        df_res = read_csv_safely(csv_path)
+        if df_res is not None:
+            pdf_path = Path(csv_path).parent / "rapport_green_fl_auto.pdf"
+            
+            # Forcer la génération même s'il existe (pour le test)
+            try:
+                # On passe un maximum d'infos pour être sûr
+                generate_pdf_report(df_res, st.session_state, save_path=str(pdf_path))
+                st.success(f"PDF créé : {pdf_path}")
+            except Exception as e:
+                # C'EST ICI QUE NOUS VERRONS LE VRAI PROBLÈME
+                st.error(f"⚠️ ÉCHEC GÉNÉRATION PDF : {str(e)}")
+                import traceback
+                st.code(traceback.format_exc()) # Affiche la pile d'erreur complète
+    output_dir = Path(csv_path).parent if csv_path else None
     df_res = read_csv_safely(csv_path)
-
+    global_accuracy = None
+    if output_dir:
+        global_accuracy = read_accuracy_value(output_dir)
     if df_res is not None and not df_res.empty:
         last = df_res.iloc[-1]
 
@@ -933,7 +971,8 @@ elif st.session_state.etape == 3:
         c5.metric("CPU power", safe_value(last.get("cpu_power"), " W"))
         c6.metric("GPU power", safe_value(last.get("gpu_power"), " W"))
         c7.metric("RAM power", safe_value(last.get("ram_power"), " W"))
-        c8.metric("Eau consommée", safe_value(last.get("water_consumed"), " L"))
+        water_consumed = last.get("water_consumed")
+        c8.metric("Eau consommée", safe_value(water_consumed, " L"))
         st.markdown("---")
 
         st.subheader("Cohérence configuration / CSV")
@@ -997,6 +1036,16 @@ elif st.session_state.etape == 3:
                 # On affiche le total combiné (Matériel + Réseau)
                 total_kwh = comp_data.get('total_combined_energy_kwh', 0)
                 st.metric("Consommation Totale", f"{total_kwh:.6f} kWh")
+                intensity_avg = comp_data.get('intensity_avg_gco2_kwh',0)
+            total_combined_CO2 = (total_kwh * intensity_avg) #Formule
+        water_consumed = float(
+            str(last.get("water_consumed", 0)).replace(",", ".")
+        )
+
+        st.metric(
+            "Score Green",
+            f"{global_accuracy / (total_combined_CO2 + water_consumed):.6f}"
+        )
 
         with st.expander("Voir les données brutes du CSV"):
             st.dataframe(df_res, width="stretch")

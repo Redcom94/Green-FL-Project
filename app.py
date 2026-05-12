@@ -18,6 +18,23 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 ENERGY_PER_GB = 0.06
+def list_outputs_files(directory):
+    """Liste tous les fichiers dans le dossier outputs avec leurs métadonnées."""
+    file_list = []
+    if not directory.exists():
+        return file_list
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            path = Path(root) / file
+            # On ignore les fichiers cachés ou temporaires
+            if not file.startswith('.'):
+                file_list.append({
+                    "display_name": f"{path.parent.name}/{file}",
+                    "full_path": path,
+                    "mtime": path.stat().st_mtime
+                })
+    # Trier du plus récent au plus ancien
+    return sorted(file_list, key=lambda x: x['mtime'], reverse=True)
 def generate_pdf_report(df_res, session_state):
     """Génère un rapport PDF lisible à partir des données CSV."""
     buffer = io.BytesIO()
@@ -323,11 +340,147 @@ def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr
             # Flower le recréera proprement au lancement.
             st.warning(f"Note : Reset du cache Flower suite à une erreur de lecture.")
             flwr_global_config.unlink()
+# --- Arborification de fichiers pour accéder à l'historique ---
+
 # ════════════════════════════════════════════════════════════════════
 # ÉCRAN 1 : CONFIGURATION
 # ════════════════════════════════════════════════════════════════════
 # --- Logique de récupération après rafraîchissement ---
 global_status = get_global_state()
+# --- Barre latérale : Explorateur de fichiers ---
+with st.sidebar:
+    st.header("📂 Historique des Runs")
+    st.write("Retrouvez vos anciens rapports et données.")
+
+    outputs_dir = PROJECT_DIR / "outputs"
+
+    if outputs_dir.exists():
+
+        # ==============================
+        # 1. DOSSIERS PRINCIPAUX
+        # ==============================
+        first_level_dirs = sorted(
+            [d for d in outputs_dir.iterdir() if d.is_dir()],
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
+
+        if first_level_dirs:
+
+            selected_main_dir = st.selectbox(
+                "📁 Choisir une date",
+                first_level_dirs,
+                format_func=lambda x: x.name
+            )
+
+            # ==============================
+            # 2. SOUS-DOSSIERS (HEURES)
+            # ==============================
+            second_level_dirs = sorted(
+                [d for d in selected_main_dir.iterdir() if d.is_dir()],
+                key=lambda x: x.stat().st_mtime,
+                reverse=True
+            )
+
+            if second_level_dirs:
+
+                selected_run_dir = st.selectbox(
+                    "🕒 Choisir une heure",
+                    second_level_dirs,
+                    format_func=lambda x: x.name
+                )
+
+                # ==============================
+                # 3. FILTRE EXTENSIONS
+                # ==============================
+                ext_filter = st.multiselect(
+                    "Filtrer par type",
+                    options=[".csv", ".json", ".pdf"],
+                    default=[".csv", ".json", ".pdf"]
+                )
+
+                # ==============================
+                # 4. FICHIERS
+                # ==============================
+                files_in_folder = []
+
+                for file in selected_run_dir.iterdir():
+
+                    if file.is_file():
+
+                        if file.name.startswith("."):
+                            continue
+
+                        if file.suffix not in ext_filter:
+                            continue
+
+                        files_in_folder.append({
+                            "name": file.name,
+                            "path": file,
+                            "mtime": file.stat().st_mtime
+                        })
+
+                files_in_folder = sorted(
+                    files_in_folder,
+                    key=lambda x: x["mtime"],
+                    reverse=True
+                )
+
+                if files_in_folder:
+
+                    selected_file_idx = st.selectbox(
+                        "📄 Choisir un fichier",
+                        range(len(files_in_folder)),
+                        format_func=lambda i: files_in_folder[i]["name"]
+                    )
+
+                    f_info = files_in_folder[selected_file_idx]
+                    f_path = f_info["path"]
+
+                    st.divider()
+
+                    st.markdown(f"**Fichier :** `{f_path.name}`")
+                    st.caption(
+                        f"Dernière modification : {time.ctime(f_info['mtime'])}"
+                    )
+
+                    # Téléchargement
+                    with open(f_path, "rb") as f:
+                        st.download_button(
+                            label="📥 Télécharger",
+                            data=f,
+                            file_name=f_path.name,
+                            mime="application/octet-stream",
+                            use_container_width=True
+                        )
+
+                    # Aperçu CSV
+                    if f_path.suffix == ".csv":
+
+                        if st.button(
+                            "👁️ Aperçu CSV",
+                            use_container_width=True
+                        ):
+                            try:
+                                df_preview = pd.read_csv(f_path, sep=';')
+                                st.dataframe(df_preview.head(5))
+
+                            except Exception as e:
+                                st.error(
+                                    f"Impossible de lire le CSV : {e}"
+                                )
+
+                else:
+                    st.info("Aucun fichier trouvé.")
+
+            else:
+                st.info("Aucun sous-dossier trouvé.")
+
+        else:
+            st.info("Aucun dossier dans outputs.")
+
+    else:
+        st.info("Le dossier outputs n'existe pas. Il n'y a pas encore eu de runs sur cet appareil.")
 if global_status["running"]:
     st.session_state.etape = 2
     st.session_state.fl_process = global_status["process"]

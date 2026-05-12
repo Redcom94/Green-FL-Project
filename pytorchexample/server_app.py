@@ -25,6 +25,7 @@ except ImportError:
     from pytorchexample.model import Net       # Modèle par défaut
 
 from codecarbon import EmissionsTracker
+CURRENT_SAVE_PATH = None
 ENERGY_PER_GB = 0.06
 # Dictionnaire de correspondance des stratégies
 STRATEGIES = {
@@ -160,6 +161,8 @@ def main(grid: Grid, context: Context) -> None:
     run_dir = current_time.strftime("%Y-%m-%d/%H-%M-%S")
     save_path = Path.cwd() / f"outputs/{run_dir}"
     save_path.mkdir(parents=True, exist_ok=True)
+    global CURRENT_SAVE_PATH
+    CURRENT_SAVE_PATH = save_path
     
     strategy.set_save_path(save_path)
     def evaluate_callable(server_round: int, arrays: ArrayRecord) -> MetricRecord:
@@ -315,6 +318,12 @@ def global_evaluate(server_round: int, arrays: ArrayRecord, dataset_name: str, n
     model.to(device)
     test_dataloader = load_centralized_dataset(dataset_name = dataset_name, img_size = img_size, num_channels= num_channels)
     test_loss, test_acc, test_f1 = test(model, test_dataloader, device, n_cls)
+    if CURRENT_SAVE_PATH is not None:
+
+        accuracy_file = CURRENT_SAVE_PATH / "last_accuracy.txt"
+
+        with open(accuracy_file, "w") as f:
+            f.write(f"{test_acc}")
 
     return MetricRecord({"accuracy": test_acc, "loss": test_loss, "f1_score":test_f1})
 

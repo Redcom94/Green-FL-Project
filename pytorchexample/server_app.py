@@ -76,7 +76,7 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
             "coal_mw":      d2.get("powerConsumptionBreakdown", {}).get("coal"),
         }
     except Exception as e:
-        print(f"⚠️ Electricity Maps indisponible : {e}")
+        print(f" Electricity Maps indisponible : {e}")
         return {"realtime_carbon_intensity": None}
 
 def estimate_network_cost(model, num_rounds, clients_per_round):
@@ -171,15 +171,15 @@ def main(grid: Grid, context: Context) -> None:
     tracker = EmissionsTracker(
         project_name=strategy_name,
         output_dir=str(save_path),
-        output_file="emission.csv",
+        output_file="server_global_emissions.csv",
         measure_power_secs=15
     )
 
-    # ⚡ Snapshot Electricity Maps avant l'entraînement
+    #  Snapshot Electricity Maps avant l'entraînement
     em_before = get_carbon_intensity_realtime(zone="BE")
     if em_before["realtime_carbon_intensity"]:
-        print(f"⚡ Intensité carbone réseau : {em_before['realtime_carbon_intensity']} gCO2eq/kWh")
-        print(f"🌿 Énergie fossile-free : {em_before.get('fossil_free_percentage', 'N/A')}%")
+        print(f" Intensité carbone réseau : {em_before['realtime_carbon_intensity']} gCO2eq/kWh")
+        print(f" Énergie fossile-free : {em_before.get('fossil_free_percentage', 'N/A')}%")
     
     import json
     with open(save_path / "grid_context.json", "w") as f:
@@ -188,7 +188,7 @@ def main(grid: Grid, context: Context) -> None:
 
     tracker.start()
     try:
-        print(f"🚀 Starting Federated Learning: {strategy_name.upper()}")
+        print(f" Starting Federated Learning: {strategy_name.upper()}")
         result = strategy.start(
             grid=grid,
             initial_arrays=arrays,
@@ -216,7 +216,7 @@ def main(grid: Grid, context: Context) -> None:
             ) / 2
             
             # Lire l'énergie totale consommée depuis le CSV CodeCarbon
-            emission_csv = save_path / "emission.csv"
+            emission_csv = save_path / "server_global_emissions.csv"
             if emission_csv.exists():
                 df_em = pd.read_csv(emission_csv)
                 if "energy_consumed" in df_em.columns:
@@ -237,7 +237,7 @@ def main(grid: Grid, context: Context) -> None:
                         if codecarbon_co2 > 0 else 0
                     )
                     
-                    print(f"\n📊 Comparaison émissions CO2 :")
+                    print(f"\n Comparaison émissions CO2 :")
                     print(f"   CodeCarbon  : {codecarbon_co2:.6f} kg CO2")
                     print(f"   ElectricityMaps : {realtime_co2:.6f} kg CO2")
                     print(f"   Écart       : {diff_pct:.1f}%")
@@ -265,7 +265,7 @@ def main(grid: Grid, context: Context) -> None:
                     }
                     with open(save_path / "em_comparison.json", "w") as f:
                         json.dump(comparison, f, indent=2)
-                    print(f"   💾 Sauvegardé dans : em_comparison.json")
+                    print(f"    Sauvegardé dans : em_comparison.json")
 
 
 
@@ -276,7 +276,7 @@ def main(grid: Grid, context: Context) -> None:
 
 
         # --- CORRECTION DES DÉCIMALES ET FORMATS CSV ---
-        print("\n🔄 Harmonisation des fichiers CSV pour Excel FR...")
+        print("\n Harmonisation des fichiers CSV pour Excel FR...")
         fichiers_csv = list(save_path.glob("*.csv"))
         
         for csv_path in fichiers_csv:
@@ -300,13 +300,13 @@ def main(grid: Grid, context: Context) -> None:
                 df_temp.to_csv(csv_path, sep=';', decimal=',', index=False)
                 print(f" ✅ Nettoyage terminé pour : {csv_path.name}")
             except Exception as e:
-                print(f" ⚠️ Erreur sur {csv_path.name} : {e}")
+                print(f"  Erreur sur {csv_path.name} : {e}")
 
         # Génération du graphique après conversion
         generate_emission_chart(save_path, strategy_name)
 
     # 6. Sauvegarde du modèle final
-    print("\n💾 Sauvegarde du modèle final...")
+    print("\n Sauvegarde du modèle final...")
     final_state_dict = result.arrays.to_torch_state_dict()
     torch.save(final_state_dict, save_path / "final_model.pt")
 
@@ -330,7 +330,7 @@ def global_evaluate(server_round: int, arrays: ArrayRecord, dataset_name: str, n
 
 def generate_emission_chart(output_path: Path, strategy_name: str):
     """Génère un graphique à partir du fichier converti (format FR)."""
-    csv_file = output_path / "emission.csv"
+    csv_file = output_path / "server_global_emissions.csv"
     if csv_file.exists():
         try:
             # On lit avec le nouveau format (point-virgule et virgule)
@@ -360,7 +360,7 @@ def generate_emission_chart(output_path: Path, strategy_name: str):
             plt.tight_layout()
             plt.savefig(output_path / f"{strategy_name.lower()}_energy_breakdown.png")
             plt.close()
-            print(f" 📊 Graphique sauvegardé dans : {output_path}")
+            print(f"  Graphique sauvegardé dans : {output_path}")
         except Exception as e:
-            print(f" ⚠️ Erreur graphique : {e}")
+            print(f"  Erreur graphique : {e}")
 

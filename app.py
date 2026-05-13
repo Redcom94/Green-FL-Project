@@ -1,4 +1,5 @@
 import streamlit as st
+import torch
 import pandas as pd
 import numpy as np
 import time
@@ -17,6 +18,8 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+# Détecter si CUDA est disponible
+GPU_AVAILABLE = torch.cuda.is_available()
 ENERGY_PER_GB = 0.06
 def read_accuracy_value(output_path):
     """Lit la dernière précision sauvegardée par le serveur."""
@@ -357,11 +360,6 @@ def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr
             # Flower le recréera proprement au lancement.
             st.warning(f"Note : Reset du cache Flower suite à une erreur de lecture.")
             flwr_global_config.unlink()
-# --- Arborification de fichiers pour accéder à l'historique ---
-
-# ════════════════════════════════════════════════════════════════════
-# ÉCRAN 1 : CONFIGURATION
-# ════════════════════════════════════════════════════════════════════
 # --- Logique de récupération après rafraîchissement ---
 global_status = get_global_state()
 # --- Barre latérale : Explorateur de fichiers ---
@@ -514,12 +512,27 @@ if st.session_state.etape == 1:
     with st.container():
         st.title("🌱 Green Federated Learning Platform")
         st.markdown("### 🛠️ Étape 1 : Configuration")
-        st.markdown("🖥️ Ressources Matérielles")
-        option_gpu = st.checkbox("Activer l'accélération GPU", value=True)
-        if option_gpu == True:
-            num_gpus = 1.0
-        else:
+        # Logique de grisement
+        if not GPU_AVAILABLE:
+            st.checkbox(
+                "Activer l'accélération GPU", 
+                value=False, 
+                disabled=True, 
+                help="Option désactivée : Aucun GPU compatible CUDA n'a été détecté sur cette machine."
+            )
+            option_gpu = False
             num_gpus = 0.0
+        else:
+            option_gpu = st.checkbox(
+                "Activer l'accélération GPU", 
+                value=st.session_state.get("use_gpu", True),
+                help="Utilise les cœurs CUDA pour l'entraînement local des clients."
+            )
+            num_gpus = 1.0 if option_gpu else 0.0
+
+        # Optionnel : Un petit message d'alerte visuel si pas de GPU
+        if not GPU_AVAILABLE:
+            st.info("ℹ️ **Note :** L'entraînement se fera exclusivement sur CPU en raison de l'absence de GPU.")
         st.divider()
 
         col_m, col_d, col_p = st.columns(3)
@@ -573,8 +586,8 @@ if st.session_state.etape == 1:
         num_channels = c_chan.selectbox("Canaux", [1, 3], index=1)
         num_classes = c_cls.number_input("Nombre de classes", value=10, min_value=2)
         with col_p:
-            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Poids</h4><p>Modèle (.pt)</p></div>', unsafe_allow_html=True)
-            model_weights = st.file_uploader("Fichier", type=["pt"], label_visibility="collapsed")
+            st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Poids</h4><p>Modèle (.pt ou .pth)</p></div>', unsafe_allow_html=True)
+            model_weights = st.file_uploader("Fichier", type=["pt", "pth"], label_visibility="collapsed")
         if model_weights is not None:
             # Définition du chemin cible
             target_path2 = PROJECT_DIR / "final_model.pt"
@@ -831,7 +844,7 @@ if st.session_state.etape == 1:
                 env["WANDB_ENTITY"] = wandb_entity
 
             # Lancement du processus avec le nouvel environnement
-            st.session_state.fl_process = subprocess.Popen(
+            """st.session_state.fl_process = subprocess.Popen(
                 ["flwr", "run", "."], 
                 cwd=PROJECT_DIR, 
                 env=env
@@ -847,16 +860,49 @@ if st.session_state.etape == 1:
                 "model_name": model_file.name if model_file else "Défaut"
             }
             st.session_state.etape = 2
+            st.rerun()"""
+
+            # --- BLOC DE LANCEMENT SÉCURISÉ ---
+            log_file_path = PROJECT_DIR / "federated_log.txt"
+            
+            # 1. On force l'encodage UTF-8 pour Python
+            env_with_utf8 = env.copy()
+            env_with_utf8["PYTHONIOENCODING"] = "utf-8"
+
+            # 2. On ouvre le fichier log en UTF-8 explicitement
+            log_f = open(log_file_path, "w", encoding="utf-8")
+            
+            st.session_state.fl_process = subprocess.Popen(
+                ["flwr", "run", "."], 
+                cwd=PROJECT_DIR, 
+                env=env_with_utf8, 
+                stdout=log_f,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            
+            global_status["running"] = True
+            global_status["process"] = st.session_state.fl_process
+            global_status["config"] = {
+                "strategy": strategie,
+                "dataset": dataset,
+                "rounds": rounds,
+                "epochs": epochs,
+                "clients": clients_number,
+                "model_name": model_file.name if model_file else "Défaut"
+            }
+            st.session_state.etape = 2
             st.rerun()
 
+
 # ════════════════════════════════════════════════════════════════════
-# ÉCRAN 2
+# ÉCRAN 2 : ENTRAÎNEMENT EN COURS
 # ════════════════════════════════════════════════════════════════════
 elif st.session_state.etape == 2:
     st.title("🔄 Étape 2 : Entraînement en cours")
     st.divider()
 
-    # Résumé config — lecture seule, pas de widgets
+    # Résumé config — lecture seule
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Stratégie", st.session_state.get("selected_strategy", "N/A"))
     c2.metric("Dataset", st.session_state.get("selected_dataset", "N/A"))
@@ -866,56 +912,68 @@ elif st.session_state.etape == 2:
     st.caption(f"Modèle : {st.session_state.get('selected_model_name', 'N/A')}")
     st.divider()
 
+    # --- AFFICHAGE DES LOGS ---
+    st.subheader("💻 Console d'exécution en temps réel")
+    log_container = st.empty()
+    log_file_path = PROJECT_DIR / "federated_log.txt"
+
+    if log_file_path.exists():
+        try:
+            with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+                last_logs = "".join(lines[-15:]) # Affiche les 15 dernières lignes
+                log_container.code(last_logs, language="bash")
+        except Exception:
+            log_container.info("Synchronisation des logs...")
+    else:
+        log_container.info("Initialisation du serveur Flower...")
+
+    # --- ÉTAT DU PROCESSUS ---
     process_running = False
     if st.session_state.fl_process is not None:
         process_running = st.session_state.fl_process.poll() is None
 
+    # Récupération du CSV de résultats si disponible
     if st.session_state.current_run_csv is None:
         csv = get_new_csv_after_run("emission.csv")
         if csv:
             st.session_state.current_run_csv = csv
 
-    df = read_csv_safely(st.session_state.current_run_csv)
     st.subheader("État du processus")
-    st.write("En cours..." if process_running else "Terminé")
+    st.write("🏃 En cours..." if process_running else "🏁 Terminé")
 
+    # Si terminé, on passe à l'étape 3
     if not process_running and st.session_state.fl_process is not None:
-        st.success("Entraînement terminé.")
+        st.success("Entraînement terminé avec succès.")
         global_status["running"] = False 
         global_status["process"] = None
         st.session_state.etape = 3
-        st.rerun()
-        global_status["running"] = False # Reset
-        global_status["process"] = None
-        st.session_state.etape = 3
+        time.sleep(1) # Petit délai pour laisser le temps au fichier CSV d'être finalisé
         st.rerun()
 
+    # --- BARRE DE NAVIGATION / ACTIONS ---
     col_nav = st.columns([1, 1, 4])
     if col_nav[0].button("⏹️ Arrêter", type="secondary"):
         if st.session_state.fl_process is not None:
             try:
-                # On récupère le processus parent (Flower)
                 parent = psutil.Process(st.session_state.fl_process.pid)
-                
-                # On tue tous les enfants d'abord (les clients, le serveur, etc.)
                 for child in parent.children(recursive=True):
                     child.terminate()
-                
-                # Puis on tue le parent
                 parent.terminate()
-                
-                st.info("Processus Flower et ses enfants arrêtés.")
+                st.info("Processus arrêté par l'utilisateur.")
             except psutil.NoSuchProcess:
                 st.warning("Le processus était déjà terminé.")
             except Exception as e:
                 st.error(f"Erreur lors de l'arrêt : {e}")
-        global_status["running"] = False # Reset ici aussi
+        
+        global_status["running"] = False 
         global_status["process"] = None
         st.session_state.etape = 1
         st.rerun()
 
+    # Boucle de rafraîchissement automatique
     if process_running:
-        time.sleep(2)
+        time.sleep(1)
         st.rerun()
 
 
@@ -938,7 +996,6 @@ elif st.session_state.etape == 3:
                 generate_pdf_report(df_res, st.session_state, save_path=str(pdf_path))
                 st.success(f"PDF créé : {pdf_path}")
             except Exception as e:
-                # C'EST ICI QUE NOUS VERRONS LE VRAI PROBLÈME
                 st.error(f"⚠️ ÉCHEC GÉNÉRATION PDF : {str(e)}")
                 import traceback
                 st.code(traceback.format_exc()) # Affiche la pile d'erreur complète

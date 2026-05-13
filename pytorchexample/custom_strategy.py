@@ -95,8 +95,6 @@ class CustomStrategyMixin:
             log(INFO, "")
             log(INFO, "[ROUND %s/%s] - Server Tracking Start", current_round, num_rounds)
 
-            # --- INITIALISATION DU TRACKER POUR CE ROUND ---
-            # On crée un fichier spécifique ou on ajoute au principal avec un nom de projet unique
             tracker = EmissionsTracker(
                 project_name=f"{self.__class__.__name__}_round_{current_round}",
                 output_dir=str(self.save_path),
@@ -105,6 +103,10 @@ class CustomStrategyMixin:
                 measure_power_secs=1
             )
             tracker.start()
+
+            # Variables réinitialisées à chaque round
+            current_acc = None
+            emissions_data = None
 
             try:
                 # --- TRAINING (CLIENTAPP-SIDE) ---
@@ -145,55 +147,37 @@ class CustomStrategyMixin:
                     log(INFO, "Global evaluation")
                     res = evaluate_fn(current_round, arrays)
                     if res is not None:
-                        current_acc = res["accuracy"] # res[1] contient le dictionnaire de métriques
-                        
-                        # Arrêt du tracker pour obtenir les émissions du round actuel
-                        emissions_data = tracker.stop() # Retourne les kg de CO2
-                        
-                        # Calcul du gain de précision
-                        acc_gain = current_acc - last_accuracy
-                        
-                        # Calcul de la métrique Carbon per Accuracy
-                        # On évite la division par zéro si l'accuracy n'a pas progressé
-                        carbon_per_acc = 0.0
-                        if acc_gain > 0:
-                            carbon_per_acc = emissions_data / acc_gain
-                        csv_path = self.save_path / "server_round_emissions.csv"
-                        try:
-                            # On lit toutes les lignes
-                            with open(csv_path, 'r', newline='') as f:
-                                lines = list(csv.reader(f))
-                            
-                            if lines:
-                                # Si c'est le premier round, on ajoute l'en-tête
-                                if current_round == 1:
-                                    lines[0].append("carbon_per_accuracy")
-                                    lines[0].append("accuracy_gain")
-                                
-                                # On ajoute les données à la dernière ligne (celle que CodeCarbon vient d'écrire)
-                                lines[-1].append(str(carbon_per_acc))
-                                lines[-1].append(str(acc_gain))
-                                
-                                # On réécrit le fichier
-                                with open(csv_path, 'w', newline='') as f:
-                                    writer = csv.writer(f)
-                                    writer.writerows(lines)
-                        except Exception as e:
-                            log(INFO, f"Impossible de mettre à jour le CSV : {e}")
-                        
-                        # Log vers WandB
-                        wandb.log({
-                            "round": current_round,
-                            "metrics/accuracy_gain": acc_gain,
-                            "metrics/carbon_per_accuracy": carbon_per_acc,
-                            "env/server_round_co2_kg": emissions_data
-                        })
-                        
-                        last_accuracy = current_acc
+                        current_acc = res["accuracy"]
+
             finally:
-                # --- ARRÊT DU TRACKER À CHAQUE FIN DE ROUND ---
+                # --- ARRÊT UNIQUE DU TRACKER ---
+                # On arrête toujours ici, qu'il y ait eu une exception ou non.
                 tracker.stop()
-                log(INFO, "[ROUND %s/%s] - Server Tracking Stop", current_round, num_rounds)
+                emissions_data = tracker.final_emissions  # kg CO2 — valeur réelle après stop()
+                log(INFO, "[ROUND %s/%s] - Server Tracking Stop (%.6f kg CO2)", current_round, num_rounds, emissions_data or 0.0)
+
+                # --- CALCUL CARBON PER ACCURACY (après le stop, donc emissions_data est fiable) ---
+                if current_acc is not None and emissions_data is not None and emissions_data > 0:
+                    acc_gain = current_acc - last_accuracy
+
+                    carbon_per_acc = emissions_data / acc_gain if acc_gain > 0 else 0.0
+
+                    temp_metrics_path = self.save_path / "temp_accuracy_metrics.csv"
+                    file_exists = temp_metrics_path.exists()
+                    with open(temp_metrics_path, 'a', newline='') as f:
+                        writer = csv.writer(f, delimiter=';')
+                        if not file_exists:
+                            writer.writerow(["round", "carbon_per_accuracy", "accuracy_gain"])
+                        writer.writerow([current_round, carbon_per_acc, acc_gain])
+
+                    wandb.log({
+                        "round": current_round,
+                        "metrics/accuracy_gain": acc_gain,
+                        "metrics/carbon_per_accuracy": carbon_per_acc,
+                        "env/server_round_co2_kg": emissions_data
+                    }, step=current_round)
+
+                    last_accuracy = current_acc
 
         log(INFO, "")
         log(INFO, "Strategy execution finished in %.2fs", time.time() - t_start)

@@ -935,7 +935,7 @@ elif st.session_state.etape == 2:
 
     # Récupération du CSV de résultats si disponible
     if st.session_state.current_run_csv is None:
-        csv = get_new_csv_after_run("emission.csv")
+        csv = get_new_csv_after_run("server_global_emissions.csv")
         if csv:
             st.session_state.current_run_csv = csv
 
@@ -983,8 +983,7 @@ elif st.session_state.etape == 2:
 elif st.session_state.etape == 3:
 
     st.title("📊 Étape 3 : Résultats finaux")
-    csv_path = st.session_state.get('current_run_csv') or get_latest_csv("emission.csv")
-    
+    csv_path = st.session_state.get('current_run_csv') or get_latest_csv("server_global_emissions.csv")
     if csv_path:
         df_res = read_csv_safely(csv_path)
         if df_res is not None:
@@ -1000,7 +999,6 @@ elif st.session_state.etape == 3:
                 import traceback
                 st.code(traceback.format_exc()) # Affiche la pile d'erreur complète
     output_dir = Path(csv_path).parent if csv_path else None
-    df_res = read_csv_safely(csv_path)
     global_accuracy = None
     if output_dir:
         global_accuracy = read_accuracy_value(output_dir)
@@ -1103,13 +1101,13 @@ elif st.session_state.etape == 3:
             "Score Green",
             f"{global_accuracy / (total_combined_CO2 + water_consumed):.6f}"
         )
-
-        with st.expander("Voir les données brutes du CSV"):
-            st.dataframe(df_res, width="stretch")
         csv_1, csv_2, csv_3, csv_4, csv_5, fichier_txt = st.columns(6)
         with csv_1:
-            st.download_button("📥 Télécharger CSV", data=df_res.to_csv(index=False, sep =';').encode('utf-8'),
-                               file_name="emission.csv", mime="text/csv")
+            path_server = get_latest_csv("emission.csv")
+            if path_server:
+                df_server = pd.read_csv(path_server, sep =';')         
+                st.download_button("📥 Télécharger CSV", data=df_server.to_csv(index=False, sep =';').encode('utf-8'),
+                                file_name="emission.csv", mime="text/csv")
         with csv_2:
             pdf_bytes = generate_pdf_report(df_res, st.session_state)
             st.download_button("📄 Télécharger PDF", data=pdf_bytes,

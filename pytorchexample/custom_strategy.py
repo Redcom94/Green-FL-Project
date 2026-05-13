@@ -3,9 +3,10 @@ import time
 from logging import INFO
 from pathlib import Path
 from typing import Callable, Iterable, Optional, Any
-
+import csv
 import torch
 import wandb
+from codecarbon import EmissionsTracker
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
 from flwr.common import log, logger
 from flwr.serverapp import Grid
@@ -89,60 +90,110 @@ class CustomStrategyMixin:
                 result.evaluate_metrics_serverapp[0] = res
 
         arrays = initial_arrays
-
+        last_accuracy = 0.0
         for current_round in range(1, num_rounds + 1):
             log(INFO, "")
-            log(INFO, "[ROUND %s/%s]", current_round, num_rounds)
+            log(INFO, "[ROUND %s/%s] - Server Tracking Start", current_round, num_rounds)
 
-            # --- TRAINING (CLIENTAPP-SIDE) ---
-            train_replies = grid.send_and_receive(
-                messages=self.configure_train(
-                    current_round, arrays, train_config, grid,
-                ),
-                timeout=timeout,
+            # --- INITIALISATION DU TRACKER POUR CE ROUND ---
+            # On crée un fichier spécifique ou on ajoute au principal avec un nom de projet unique
+            tracker = EmissionsTracker(
+                project_name=f"{self.__class__.__name__}_round_{current_round}",
+                output_dir=str(self.save_path),
+                output_file="emission.csv",
+                on_csv_write="update",
+                measure_power_secs=1
             )
+            tracker.start()
 
-            agg_arrays, agg_train_metrics = self.aggregate_train(
-                current_round, train_replies,
-            )
+            try:
+                # --- TRAINING (CLIENTAPP-SIDE) ---
+                train_replies = grid.send_and_receive(
+                    messages=self.configure_train(current_round, arrays, train_config, grid),
+                    timeout=timeout,
+                )
 
-            if agg_arrays is not None:
-                result.arrays = agg_arrays
-                arrays = agg_arrays
-            if agg_train_metrics is not None:
-                log(INFO, "\t└──> Aggregated MetricRecord: %s", agg_train_metrics)
-                result.train_metrics_clientapp[current_round] = agg_train_metrics
-                wandb.log(dict(agg_train_metrics), step=current_round)
+                agg_arrays, agg_train_metrics = self.aggregate_train(current_round, train_replies)
+
+                if agg_arrays is not None:
+                    result.arrays = agg_arrays
+                    arrays = agg_arrays
+                if agg_train_metrics is not None:
+                    log(INFO, "\t└──> Aggregated MetricRecord: %s", agg_train_metrics)
+                    result.train_metrics_clientapp[current_round] = agg_train_metrics
+                    wandb.log(dict(agg_train_metrics), step=current_round)
 
             # --- EVALUATION (CLIENTAPP-SIDE) ---
-            evaluate_replies = grid.send_and_receive(
-                messages=self.configure_evaluate(
-                    current_round, arrays, evaluate_config, grid,
-                ),
-                timeout=timeout,
-            )
+                evaluate_replies = grid.send_and_receive(
+                    messages=self.configure_evaluate(
+                        current_round, arrays, evaluate_config, grid,
+                    ),
+                    timeout=timeout,
+                )
 
-            agg_evaluate_metrics = self.aggregate_evaluate(
-                current_round, evaluate_replies,
-            )
+                agg_evaluate_metrics = self.aggregate_evaluate(
+                    current_round, evaluate_replies,
+                )
 
-            if agg_evaluate_metrics is not None:
-                log(INFO, "\t└──> Aggregated MetricRecord: %s", agg_evaluate_metrics)
-                result.evaluate_metrics_clientapp[current_round] = agg_evaluate_metrics
-                wandb.log(dict(agg_evaluate_metrics), step=current_round)
+                if agg_evaluate_metrics is not None:
+                    log(INFO, "\t└──> Aggregated MetricRecord: %s", agg_evaluate_metrics)
+                    result.evaluate_metrics_clientapp[current_round] = agg_evaluate_metrics
+                    wandb.log(dict(agg_evaluate_metrics), step=current_round)
 
-            # --- EVALUATION (SERVERAPP-SIDE) ---
-            if evaluate_fn:
-                log(INFO, "Global evaluation")
-                res = evaluate_fn(current_round, arrays)
-                log(INFO, "\t└──> MetricRecord: %s", res)
-                if res is not None:
-                    result.evaluate_metrics_serverapp[current_round] = res
-                    self._update_best_acc(current_round, res["accuracy"], arrays)
-                    
-                    # AJOUTE UN PRÉFIXE ICI POUR WANDB
-                    server_metrics = {f"server/{k}": v for k, v in dict(res).items()}
-                    wandb.log(server_metrics, step=current_round)
+                # --- EVALUATION (SERVERAPP-SIDE) ---
+                if evaluate_fn:
+                    log(INFO, "Global evaluation")
+                    res = evaluate_fn(current_round, arrays)
+                    if res is not None:
+                        current_acc = res["accuracy"] # res[1] contient le dictionnaire de métriques
+                        
+                        # Arrêt du tracker pour obtenir les émissions du round actuel
+                        emissions_data = tracker.stop() # Retourne les kg de CO2
+                        
+                        # Calcul du gain de précision
+                        acc_gain = current_acc - last_accuracy
+                        
+                        # Calcul de la métrique Carbon per Accuracy
+                        # On évite la division par zéro si l'accuracy n'a pas progressé
+                        carbon_per_acc = 0.0
+                        if acc_gain > 0:
+                            carbon_per_acc = emissions_data / acc_gain
+                        csv_path = self.save_path / "server_round_emissions.csv"
+                        try:
+                            # On lit toutes les lignes
+                            with open(csv_path, 'r', newline='') as f:
+                                lines = list(csv.reader(f))
+                            
+                            if lines:
+                                # Si c'est le premier round, on ajoute l'en-tête
+                                if current_round == 1:
+                                    lines[0].append("carbon_per_accuracy")
+                                    lines[0].append("accuracy_gain")
+                                
+                                # On ajoute les données à la dernière ligne (celle que CodeCarbon vient d'écrire)
+                                lines[-1].append(str(carbon_per_acc))
+                                lines[-1].append(str(acc_gain))
+                                
+                                # On réécrit le fichier
+                                with open(csv_path, 'w', newline='') as f:
+                                    writer = csv.writer(f)
+                                    writer.writerows(lines)
+                        except Exception as e:
+                            log(INFO, f"Impossible de mettre à jour le CSV : {e}")
+                        
+                        # Log vers WandB
+                        wandb.log({
+                            "round": current_round,
+                            "metrics/accuracy_gain": acc_gain,
+                            "metrics/carbon_per_accuracy": carbon_per_acc,
+                            "env/server_round_co2_kg": emissions_data
+                        })
+                        
+                        last_accuracy = current_acc
+            finally:
+                # --- ARRÊT DU TRACKER À CHAQUE FIN DE ROUND ---
+                tracker.stop()
+                log(INFO, "[ROUND %s/%s] - Server Tracking Stop", current_round, num_rounds)
 
         log(INFO, "")
         log(INFO, "Strategy execution finished in %.2fs", time.time() - t_start)

@@ -206,9 +206,29 @@ def main(grid: Grid, context: Context) -> None:
         )
     finally:
         tracker.stop()
+        main_csv = save_path / "emission.csv"
+        temp_csv = save_path / "temp_accuracy_metrics.csv"
+        if main_csv.exists() and temp_csv.exists():
+            try:
+                # 1. Lire le fichier principal (CodeCarbon utilise souvent la virgule par défaut)
+                df_main = pd.read_csv(main_csv) 
+                # 2. Lire vos métriques temporaires
+                df_temp = pd.read_csv(temp_csv, sep=';')
+                
+                # 3. Fusion (Join) sur l'index ou le numéro de ligne 
+                # (En FL, 1 ligne CodeCarbon = 1 round, donc les index correspondent)
+                df_final = pd.concat([df_main, df_temp[['carbon_per_accuracy', 'accuracy_gain']]], axis=1)
+                
+                # 4. Sauvegarde finale au format harmonisé (FR)
+                df_final.to_csv(main_csv, sep=';', decimal=',', index=False)
+                
+                # 5. Nettoyage du fichier temporaire
+                temp_csv.unlink()
+                print("✅ Fusion des métriques Carbon/Accuracy réussie !")
+            except Exception as e:
+                print(f"⚠️ Erreur lors de la fusion : {e}")
         #  Snapshot Electricity Maps après l'entraînement + comparaison
         em_after = get_carbon_intensity_realtime(zone="BE")
-        
         if em_before["realtime_carbon_intensity"] and em_after["realtime_carbon_intensity"]:
             intensity_avg = (
                 em_before["realtime_carbon_intensity"] + 
@@ -363,4 +383,3 @@ def generate_emission_chart(output_path: Path, strategy_name: str):
             print(f"  Graphique sauvegardé dans : {output_path}")
         except Exception as e:
             print(f"  Erreur graphique : {e}")
-

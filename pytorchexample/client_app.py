@@ -39,7 +39,7 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
             "datetime": data.get("datetime"),
         }
     except Exception as e:
-        print(f"⚠️ Electricity Maps indisponible : {e}")
+        print(f" Electricity Maps indisponible : {e}")
         return {"realtime_carbon_intensity": None}
 
 # --- Fonction Utilitaire pour corriger le format CSV (Point vers Virgule) ---
@@ -58,7 +58,7 @@ def harmoniser_csv_format(file_path: Path):
             df.to_csv(excel_path, sep=';', decimal=',', index=False)
             print(f"✅ Version Excel générée : {excel_path.name}")
     except Exception as e:
-        print(f"⚠️ Impossible de convertir {file_path.name} : {e}")
+        print(f" Impossible de convertir {file_path.name} : {e}")
 
 
 
@@ -110,7 +110,7 @@ def train(msg: Message, context: Context):
     if blur_percent > 0:
         print(f"[Client {partition_id}] Flou Gaussien appliqué : {blur_percent:.0f}%")
 
-    trainloader, _ = load_data(
+    trainloader = load_data(
         partition_id, num_partitions, batch_size, 
         small_client, medium_client, big_client, 
         dataset_name, img_size, num_channels, alpha, self_balancing, blur_percent
@@ -159,7 +159,7 @@ def train(msg: Message, context: Context):
     # ⚡ Snapshot Electricity Maps avant le round
     em_snapshot = get_carbon_intensity_realtime(zone="BE")
     if em_snapshot["realtime_carbon_intensity"]:
-        print(f"⚡ [Client {partition_id}] Intensité réseau : "
+        print(f" [Client {partition_id}] Intensité réseau : "
               f"{em_snapshot['realtime_carbon_intensity']} gCO2eq/kWh")
     tracker.start()
     try:
@@ -201,7 +201,7 @@ def train(msg: Message, context: Context):
         "client_cpu": cpu_usage,
         "client_ram": ram_info.percent,
     }
-    print(f"📦 Client {partition_id} | Taille Dataset Train : {len(trainloader.dataset)} exemples")
+    print(f" Client {partition_id} | Taille Dataset Train : {len(trainloader.dataset)} exemples")
     metric_record = MetricRecord(metrics)
     content = RecordDict({"arrays": model_record, "metrics": metric_record})
     return Message(content=content, reply_to=msg)
@@ -242,7 +242,7 @@ def evaluate(msg: Message, context: Context):
     blur_config = json.loads(blur_config_raw) if isinstance(blur_config_raw, str) else {}
     blur_percent = float(blur_config.get(str(partition_id), 0))
 
-    _, valloader = load_data(
+    valloader = load_data(
         partition_id, num_partitions, batch_size, 
         small_client, medium_client, big_client, 
         dataset_name, img_size, num_channels, alpha, self_balancing, blur_percent
@@ -253,9 +253,9 @@ def evaluate(msg: Message, context: Context):
     gpu_disponible = torch.cuda.is_available()
     nom_gpu = torch.cuda.get_device_name(0) if gpu_disponible else "Aucun (Mode CPU/Intégré)"
     
-    print(f"🖥️  Client {partition_id} utilise : {nom_gpu}")
+    print(f"  Client {partition_id} utilise : {nom_gpu}")
     if not gpu_disponible:
-        print("⚠️  Avis : Les mesures 'gpu_energy' seront à 0 sur ce matériel (Intel Iris Xe).")
+        print("  Avis : Les mesures 'gpu_energy' seront à 0 sur ce matériel (Intel Iris Xe).")
 
     # Modification du project_name pour inclure l'info matériel
     suffixe_materiel = "GPU" if gpu_disponible else "CPU"

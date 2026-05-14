@@ -192,27 +192,26 @@ class CustomStrategyMixin:
     def aggregate_evaluate(self, current_round: int, results: Iterable[Message]):
         """Agrège les métriques d'évaluation des clients."""
         
-        # 1. On récupère l'UNIQUE objet renvoyé par FedAvg
-        agg_metrics = super().aggregate_evaluate(current_round, results)
+        # Filter failures here as well!
+        successful_results = [msg for msg in results if msg.has_content()]
+        
+        if not successful_results:
+            return None
 
-        # Si personne n'a répondu, on s'arrête
+        # Aggregate using parent logic
+        agg_metrics = super().aggregate_evaluate(current_round, successful_results)
+
         if agg_metrics is None:
             return None
 
-        # 2. Sécurité : Vérifier que c'est bien un MetricRecord
         if not isinstance(agg_metrics, (dict, MetricRecord)):
-            # Si Flower a renvoyé autre chose (rare), on le transforme
             agg_metrics = MetricRecord(agg_metrics)
 
-        # 3. Extraction manuelle de la perte (si elle existe dans le record)
-        # La perte est souvent déjà agrégée par FedAvg sous la clé 'loss'
-        agg_loss = agg_metrics.get("loss", 0.0)
-
-        # 4. Calcul de ton F1-Score personnalisé
+        # Calculate F1 only for successful results
         f1_scores = []
         example_counts = []
 
-        for msg in results:
+        for msg in successful_results:
             m = msg.content.get("metrics", {})
             if "eval_f1" in m and "num-examples" in m:
                 f1_scores.append(float(m["eval_f1"]))
@@ -222,44 +221,42 @@ class CustomStrategyMixin:
             total_examples = sum(example_counts)
             if total_examples > 0:
                 weighted_f1 = sum(f * e for f, e in zip(f1_scores, example_counts)) / total_examples
-                
                 log(INFO, "\t└──> [Global Evaluation] Aggregated F1-Score: %.4f", weighted_f1)
-                
-                # On injecte le F1 dans le record existant
                 agg_metrics["f1_score"] = weighted_f1
 
-        # ATTENTION : On renvoie agg_metrics (Flower s'attend à recevoir cet objet unique)
         return agg_metrics
     """ les strategy fedavg,fedproxy permettent de calculer les moyennes des poids et tous mais ils ignorent complement les nouvelles metriques client_cpu et client_ram"""
     def aggregate_train(self, current_round: int, results: Iterable[Message]):
         """Récupère les poids ET les métriques psutil des clients."""
         
-        # 1. Appeler la méthode originale pour agréger les poids du modèle
-        # (On utilise super() pour que FedAvg/FedProx fasse son travail habituel)
-        agg_arrays, agg_metrics = super().aggregate_train(current_round, results)
+        # 1. Filter out failures: Keep only messages that have content
+        # In the new API, we just check msg.has_content()
+        successful_results = [msg for msg in results if msg.has_content()]
 
-        #super() signifie on cherche d'abrd l'agregation des poids a l'aide de de fedavg 
+        if not successful_results:
+            log(INFO, "No successful results to aggregate in round %s", current_round)
+            return None, {}
 
-        # 2. Extraire les données psutil envoyées par les clients
+        # 2. Call the parent aggregation (FedAvg/Adam/etc.) with ONLY successful results
+        agg_arrays, agg_metrics = super().aggregate_train(current_round, successful_results)
+
+        # 3. Extract psutil data from the filtered list
         cpus = []
         rams = []
         
-        for msg in results:
-            # On cherche les clés que tu as définies dans client_app.py
+        for msg in successful_results:
             metrics = msg.content.get("metrics", {})
             if "client_cpu" in metrics:
                 cpus.append(metrics["client_cpu"])
             if "client_ram" in metrics:
                 rams.append(metrics["client_ram"])
 
-        # 3. Calculer la moyenne et logger dans le terminal + W&B
+        # 4. Calculate averages
         if cpus and rams:
             avg_cpu = sum(cpus) / len(cpus)
             avg_ram = sum(rams) / len(rams)
-            
             log(INFO, "\t└──> [Client Monitoring] Avg CPU: %.2f%% | Avg RAM: %.2f%%", avg_cpu, avg_ram)
             
-            # Ajouter ces moyennes aux métriques pour qu'elles apparaissent dans W&B
             if agg_metrics is None:
                 agg_metrics = MetricRecord({"avg_cpu": avg_cpu, "avg_ram": avg_ram})
             else:

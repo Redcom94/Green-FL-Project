@@ -123,8 +123,6 @@ def load_data(
         range(max(1, int(len(partition) * fraction)))
     )
 
-    # Divide data: 80% train, 20% test
-    partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
     
     # Intégration du flou spécifique au client via partial
     current_transforms = partial(
@@ -134,12 +132,11 @@ def load_data(
         blur_percent=blur_percent
     )
     
-    partition_train_test = partition_train_test.with_transform(current_transforms)
+    partition = partition.with_transform(current_transforms)
 
-    trainloader = DataLoader(partition_train_test["train"], batch_size=batch_size, shuffle=True)
-    testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
+    loader = DataLoader(partition, batch_size=batch_size, shuffle=True)
 
-    return trainloader, testloader
+    return loader
 
 
 def load_centralized_dataset(dataset_name="uoft-cs/cifar10", img_size=32, num_channels=3):

@@ -949,6 +949,11 @@ elif st.session_state.etape == 2:
         global_status["process"] = None
         st.session_state.etape = 3
         time.sleep(1) # Petit délai pour laisser le temps au fichier CSV d'être finalisé
+            # Récupération du CSV de résultats si disponible
+        if st.session_state.current_run_csv is None:
+            csv = get_new_csv_after_run("server_global_emissions.csv")
+            if csv:
+                st.session_state.current_run_csv = csv
         st.rerun()
 
     # --- BARRE DE NAVIGATION / ACTIONS ---
@@ -983,7 +988,7 @@ elif st.session_state.etape == 2:
 elif st.session_state.etape == 3:
 
     st.title("📊 Étape 3 : Résultats finaux")
-    csv_path = st.session_state.get('current_run_csv') or get_latest_csv("server_global_emissions.csv")
+    csv_path = get_latest_csv("server_global_emissions.csv")
     if csv_path:
         df_res = read_csv_safely(csv_path)
         if df_res is not None:

@@ -1,0 +1,16 @@
+{
+  "strategy": "fedavg",
+  "zone": "BE",
+  "intensity_before_gco2_kwh": 89,
+  "intensity_after_gco2_kwh": 89,
+  "intensity_avg_gco2_kwh": 89.0,
+  "energy_consumed_kwh": 0.0008293558895019,
+  "codecarbon_kg_co2": 0.0001145398538314,
+  "electricitymaps_kg_co2": 7.38126741656691e-05,
+  "difference_percent": 35.55721288563923,
+  "datetime_start": "2026-05-14T14:00:00.000Z",
+  "datetime_end": "2026-05-14T14:00:00.000Z",
+  "network_transfer_gb": 0.0009387917816638947,
+  "network_energy_kwh": 5.6327506899833676e-05,
+  "total_combined_energy_kwh": 0.0008856833964017337
+}

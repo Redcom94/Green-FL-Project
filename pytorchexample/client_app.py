@@ -22,17 +22,17 @@ from pytorchexample.task import train as train_fn
 
 
 
-import requests
-
+import requests    #envoyer une requette http en ligne vers electricte maps afin d'obtenir des resultat en direct 
+#intensité carbone d'un pays ou d'une région spécifique grâce au paramètre zone
 def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
     """Récupère l'intensité carbone en temps réel via Electricity Maps."""
     try:
         response = requests.get(
             f"https://api.electricitymap.org/v3/carbon-intensity/latest?zone={zone}",
             headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
-            timeout=5
+            timeout=5  # coupe la tentative de connexion apres 5 seconde si le serveur api de electrictie maps ne repond pas , cequi empeche strealit de geler 
         )
-        data = response.json()
+        data = response.json() #convertir la reponse en dictionnaire python 
         return {
             "zone": zone,
             "realtime_carbon_intensity": data.get("carbonIntensity"),
@@ -42,7 +42,7 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
         print(f" Electricity Maps indisponible : {e}")
         return {"realtime_carbon_intensity": None}
 
-# --- Fonction Utilitaire pour corriger le format CSV (Point vers Virgule) ---
+# fonction pour corriger les formar csv 
 def harmoniser_csv_format(file_path: Path):
     """
     Lit un CSV au format US (virgule et point décimal) 
@@ -50,7 +50,7 @@ def harmoniser_csv_format(file_path: Path):
     """
     try:
         if file_path.exists():
-            # On lit l'original (toujours en US)
+            
             df = pd.read_csv(file_path, sep=',', decimal='.')
             
             # On sauvegarde dans un NOUVEAU fichier pour Excel
@@ -67,28 +67,28 @@ def harmoniser_csv_format(file_path: Path):
 # Flower ClientApp
 app = ClientApp()
 
-@app.train()
+@app.train() # declencher l'entrainement local 
 def train(msg: Message, context: Context):
     """Train the model on local data."""
-    # Monitoring initial
-    cpu_usage = psutil.cpu_percent(interval=0.1)
-    ram_info = psutil.virtual_memory()
+    
+    cpu_usage = psutil.cpu_percent(interval=0.1) # calcule l'utilisation du CPU en arrière-plan sur un court intervalle de 0,1 seconde
+    ram_info = psutil.virtual_memory()# recuperer l'etat global de la ram 
     partition_id = context.node_config["partition-id"]
     
     print(f"[monitoring client {partition_id}]")
     print(f"Charge CPU : {cpu_usage}%")
     print(f"RAM utilisée : {ram_info.percent}% ({ram_info.used / 1024**3:.2f} GB)")
 
-    # 1. Chargement du modèle
+    # chargement du modele
     model = Net()
-    num_gpus = context.run_config["num-gpus"]
-    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
-    device = torch.device("cuda:0" if torch.cuda.is_available() and num_gpus == 1 else "cpu")
-    model.to(device)
+    num_gpus = context.run_config["num-gpus"] #recuperation le nombre de processus 
+    model.load_state_dict(msg.content["arrays"].to_torch_state_dict())#extraction des poind globaux du modele enevoyer par le server app (serveur central )
+    device = torch.device("cuda:0" if torch.cuda.is_available() and num_gpus == 1 else "cpu")#choix de carte graphique ou tt simplement outil de calcule
+    model.to(device) #envoie de modele vers le device 
     
-    current_round = msg.content["config"].get("server_round", 0)
+    current_round = msg.content["config"].get("server_round", 0)#recuperation le numero de round
 
-    # 2. Configuration et Chargement des données
+    # chargement du modele 
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
     alpha = context.run_config.get("alpha", 0.1)
@@ -98,11 +98,11 @@ def train(msg: Message, context: Context):
     medium_client = context.run_config.get("medium-clients", 0)
     big_client = context.run_config.get("big-clients", 0)
 
-    # Détermination des paramètres d'image selon le dataset
+    # determination de parametee de l'image de la dataset 
     num_channels = context.run_config.get("num-channels", 3)
     img_size = context.run_config.get("img-size", 32)
 
-    # Gestion du flou (Feature Skew)
+    # gestion de floue 
     blur_config_raw = context.run_config.get("blur-config", "{}")
     blur_config = json.loads(blur_config_raw) if isinstance(blur_config_raw, str) else {}
     blur_percent = float(blur_config.get(str(partition_id), 0))
@@ -123,7 +123,7 @@ def train(msg: Message, context: Context):
     save_path = Path(save_path_str)
     save_path.mkdir(parents=True, exist_ok=True)
 
-    # 4. Log des ressources (CPU/RAM)
+    # 4. log des ressource cpu et gpu 
     log_file = save_path / "client_stats.csv"
     file_exists = log_file.exists()
     with open(log_file, "a", newline="") as f:
@@ -156,7 +156,7 @@ def train(msg: Message, context: Context):
         on_csv_write="append",
         measure_power_secs=1
     )
-    # ⚡ Snapshot Electricity Maps avant le round
+    # capture d'ecran d'electricite maps avant le lancement de l'entrainement  ( on va faire la difference avec la capture apres pour s'avoir combien a ete consommée)
     em_snapshot = get_carbon_intensity_realtime(zone="BE")
     if em_snapshot["realtime_carbon_intensity"]:
         print(f" [Client {partition_id}] Intensité réseau : "
@@ -173,7 +173,8 @@ def train(msg: Message, context: Context):
     finally:        
         tracker.stop()
         harmoniser_csv_format(save_path / emissions_file)
-        # ⚡ Log Electricity Maps dans client_stats.csv
+        
+        #log electricite maps de client_stat csv
         em_intensity = em_snapshot.get("realtime_carbon_intensity")
         if em_intensity:
             log_em_file = save_path / "client_em_intensity.csv"
@@ -193,7 +194,7 @@ def train(msg: Message, context: Context):
                     em_snapshot.get("datetime", "N/A")
                 ])
 
-    # 6. Retour des résultats
+    # retour des resultat 
     model_record = ArrayRecord(model.state_dict())
     metrics = {
         "train_loss": train_loss,
@@ -228,7 +229,7 @@ def evaluate(msg: Message, context: Context):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # 3. Données
+    # donnée
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
     alpha = context.run_config.get("alpha", 0.1)
@@ -262,7 +263,7 @@ def evaluate(msg: Message, context: Context):
 
 
 
-    # 4. CodeCarbon
+    # code carbone
     eval_emissions_file = "eval_emissions_history.csv"
     tracker = EmissionsTracker(
         project_name=f"client_{partition_id}_round_{current_round}_eval",
@@ -279,7 +280,7 @@ def evaluate(msg: Message, context: Context):
         tracker.stop()
         harmoniser_csv_format(save_path / eval_emissions_file)
 
-    # 5. Retour des métriques
+    # retour des metriwque de loss er accuracy 
     metrics = {
         "eval_loss": eval_loss,
         "eval_acc": eval_acc,

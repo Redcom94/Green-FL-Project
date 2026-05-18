@@ -18,7 +18,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-# Détecter si CUDA est disponible
+# detection de la disponibilite de cuda
 GPU_AVAILABLE = torch.cuda.is_available()
 ENERGY_PER_GB = 0.06
 def read_accuracy_value(output_path):
@@ -32,6 +32,7 @@ def read_accuracy_value(output_path):
         except:
             return None
     return None
+#""" la detection de gpu, constante energie et la fonction de lecture de precision """
 def list_outputs_files(directory):
     """Liste tous les fichiers dans le dossier outputs avec leurs métadonnées."""
     file_list = []
@@ -49,6 +50,7 @@ def list_outputs_files(directory):
                 })
     # Trier du plus récent au plus ancien
     return sorted(file_list, key=lambda x: x['mtime'], reverse=True)
+# cette fonction sert pour listing recursif du dossier output avec les metadonnées, trier par date de moficiton decroissante 
 def generate_pdf_report(df_res, session_state, save_path = None):
     """Génère un rapport PDF lisible à partir des données CSV."""
     buffer = io.BytesIO()
@@ -61,8 +63,8 @@ def generate_pdf_report(df_res, session_state, save_path = None):
         rightMargin=20*mm,
         topMargin=20*mm,
         bottomMargin=20*mm,
-    )
-
+    )# instanciation de la strucute du document 
+    # la fonction generate pdf report permet de generer des rapport de perfermance eco responsable au format pdf 
     GREEN = colors.HexColor("#2E7D32")
     LIGHT_GREEN = colors.HexColor("#E8F5E9")
     DARK_GRAY = colors.HexColor("#212121")
@@ -92,7 +94,7 @@ def generate_pdf_report(df_res, session_state, save_path = None):
 
     story = []
 
-    # ── Header ──
+    
     story.append(Paragraph("📊 Rapport Green FL", title_style))
     from datetime import datetime
     story.append(Paragraph(f"Généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}", subtitle_style))
@@ -129,7 +131,7 @@ def generate_pdf_report(df_res, session_state, save_path = None):
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]
-        # Alternate bg per pair of rows
+        
         for r in range(0, len(cells), 2):
             bg = LIGHT_GREEN if (r // 2) % 2 == 0 else LIGHT_GRAY
             style_cmds.append(("BACKGROUND", (0, r), (-1, r+1), bg))
@@ -138,7 +140,7 @@ def generate_pdf_report(df_res, session_state, save_path = None):
 
     last = df_res.iloc[-1]
 
-    # ── Section 1 : Configuration ──
+    # section une : configuration 
     story.append(Paragraph("⚙️ Configuration demandée", section_style))
     config_data = [
         ("Stratégie", session_state.get("selected_strategy", "N/A")),
@@ -151,7 +153,7 @@ def generate_pdf_report(df_res, session_state, save_path = None):
     ]
     story.append(metric_table(config_data))
     story.append(Spacer(1, 5*mm))
-# --- Section 2 : Coût Réseau ---
+# section deux, cout de reseau 
     path_comp = get_latest_csv("em_comparison.json")
     if path_comp and path_comp.exists():
         with open(path_comp, "r") as f:
@@ -169,8 +171,8 @@ def generate_pdf_report(df_res, session_state, save_path = None):
         story.append(metric_table(network_metrics))
         story.append(Spacer(1, 5*mm))
 
-    # ── Section 3 : Résumé Environnemental ──
-    story.append(Paragraph("🌿 Résumé Environnemental", section_style))
+    #section trois , resume de mesure 
+    story.append(Paragraph(" Résumé Environnemental", section_style))
     env_data = [
         ("CO<sub rise='2' size='7'>2</sub> émis (kg)", safe_value(last.get("emissions"), "")),
         ("Énergie consommée (kWh)", safe_value(last.get("energy_consumed"), "")),
@@ -184,8 +186,8 @@ def generate_pdf_report(df_res, session_state, save_path = None):
     story.append(metric_table(env_data))
     story.append(Spacer(1, 5*mm))
 
-    # ── Section 4 : Expérience & Machine ──
-    story.append(Paragraph("🧪 Expérience & Machine", section_style))
+    # section quatre , experience d ela machine , cpu, gpu pue 
+    story.append(Paragraph(" Expérience & Machine", section_style))
     exp_data = [
         ("Projet", safe_value(last.get("project_name"))),
         ("Run ID", safe_value(last.get("run_id"))),
@@ -255,7 +257,7 @@ for key, default in [
         st.session_state[key] = default
 
 # --- Fonctions utilitaires ---
-@st.cache_resource
+@st.cache_resource  # cette ligne permet de charger le modele une seul fois au demarrage  et le garder en memoire , comme ca on evite de le charger a chaque experience 
 def get_global_state():
     # Cet objet sera partagé par TOUS les utilisateurs et TOUS les rafraîchissements
     return {"running": False, "process": None, "config": {}}
@@ -298,7 +300,7 @@ def read_csv_safely(path):
     except: return None
 
 def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr, f_train, f_eval, num_clients, extra_opts, alpha, self_balancing, small_c, medium_c, big_c, dataset_name, img_size, num_channels, num_classes, blur_config=None):
-    # --- 1. Mise à jour de pyproject.toml ---
+    # mise a jour de pyprOJEC.toml
     pyproject_path = PROJECT_DIR / "pyproject.toml"
     pyproject_data = toml.load(pyproject_path)
     cfg = pyproject_data["tool"]["flwr"]["app"]["config"]
@@ -325,6 +327,9 @@ def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr
     
     # blur_config : dict {client_id -> blur_percent}, sérialisé en JSON string pour pyproject.toml
     cfg["blur-config"] = json.dumps({str(k): v for k, v in (blur_config or {}).items()})
+    # expression blur_config empeche le rogramme planter si aucune configuration de flouatage n'a ete apparu , remplacer un non par un dictionnaire vide pour respecter la coherence 
+    #str(k) pour transformer les numero en text
+    #json.dumps raduit le dictionnaire Python en une chaîne de caractères puis elle stocke le text dans la case cfg["blur-config"] sera ensuite écrite directement dans le fichier pyproject.toml
 
     for key, val in extra_opts.items():
         cfg[key] = val
@@ -332,7 +337,7 @@ def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr
     with open(pyproject_path, "w") as f:
         toml.dump(pyproject_data, f)
 
-    # --- 2. Mise à jour de \.flwr\config.toml ---
+    #  \.flwr\config.toml 
     flwr_global_config = Path.home() / ".flwr" / "config.toml"
     
     if flwr_global_config.exists():
@@ -360,9 +365,9 @@ def write_pyproject_with_config(batch_size,num_gpus,strategy, rounds, epochs, lr
             # Flower le recréera proprement au lancement.
             st.warning(f"Note : Reset du cache Flower suite à une erreur de lecture.")
             flwr_global_config.unlink()
-# --- Logique de récupération après rafraîchissement ---
+
 global_status = get_global_state()
-# --- Barre latérale : Explorateur de fichiers ---
+
 with st.sidebar:
     st.header("📂 Historique des Runs")
     st.write("Retrouvez vos anciens rapports et données.")
@@ -371,9 +376,7 @@ with st.sidebar:
 
     if outputs_dir.exists():
 
-        # ==============================
-        # 1. DOSSIERS PRINCIPAUX
-        # ==============================
+        # dossier principale
         first_level_dirs = sorted(
             [d for d in outputs_dir.iterdir() if d.is_dir()],
             key=lambda x: x.stat().st_mtime,
@@ -388,9 +391,7 @@ with st.sidebar:
                 format_func=lambda x: x.name
             )
 
-            # ==============================
-            # 2. SOUS-DOSSIERS (HEURES)
-            # ==============================
+            
             second_level_dirs = sorted(
                 [d for d in selected_main_dir.iterdir() if d.is_dir()],
                 key=lambda x: x.stat().st_mtime,
@@ -405,18 +406,14 @@ with st.sidebar:
                     format_func=lambda x: x.name
                 )
 
-                # ==============================
-                # 3. FILTRE EXTENSIONS
-                # ==============================
+                
                 ext_filter = st.multiselect(
                     "Filtrer par type",
                     options=[".csv", ".json", ".pdf", ".png"],
                     default=[".csv", ".json", ".pdf", ".png"]
                 )
 
-                # ==============================
-                # 4. FICHIERS
-                # ==============================
+               
                 files_in_folder = []
 
                 for file in selected_run_dir.iterdir():
@@ -589,13 +586,13 @@ if st.session_state.etape == 1:
             st.markdown('<div style="background-color:#f0f2f6;padding:20px;border-radius:15px;border-left:5px solid #4CAF50;height:160px;"><h4>🧠 Poids</h4><p>Modèle (.pt ou .pth)</p></div>', unsafe_allow_html=True)
             model_weights = st.file_uploader("Fichier", type=["pt", "pth"], label_visibility="collapsed")
         if model_weights is not None:
-            # Définition du chemin cible
+            
             target_path2 = PROJECT_DIR / "final_model.pt"
             
-            # Création du dossier s'il n'existe pas
+            
             target_path2.parent.mkdir(parents=True, exist_ok=True)
             
-            # Écriture du contenu
+            
             with open(target_path2, "wb") as f:
                 f.write(model_weights.getbuffer())
             st.success(f"Modèle sauvegardé sous : {target_path2.name}")
@@ -789,14 +786,12 @@ if st.session_state.etape == 1:
                         )
                         
                         
-                        # 3. On ferme immédiatement le run
+                    
                         test_run.finish()
-                        #Clean up les restes éventuels
+                        
                         if hasattr(wandb, "setup"):
                             wandb.setup()._teardown()
-                        # --- NETTOYAGE CRUCIAL ---
-                        # On réinitialise les variables d'environnement pour que le 
-                        # prochain run (dans le sous-processus) reparte de zéro
+                        
                         if "WANDB_API_KEY" in os.environ:
                             del os.environ["WANDB_API_KEY"]
                         
@@ -862,14 +857,14 @@ if st.session_state.etape == 1:
             st.session_state.etape = 2
             st.rerun()"""
 
-            # --- BLOC DE LANCEMENT SÉCURISÉ ---
+            
             log_file_path = PROJECT_DIR / "federated_log.txt"
             
-            # 1. On force l'encodage UTF-8 pour Python
+            
             env_with_utf8 = env.copy()
             env_with_utf8["PYTHONIOENCODING"] = "utf-8"
 
-            # 2. On ouvre le fichier log en UTF-8 explicitement
+            
             log_f = open(log_file_path, "w", encoding="utf-8")
             
             st.session_state.fl_process = subprocess.Popen(
@@ -895,14 +890,12 @@ if st.session_state.etape == 1:
             st.rerun()
 
 
-# ════════════════════════════════════════════════════════════════════
-# ÉCRAN 2 : ENTRAÎNEMENT EN COURS
-# ════════════════════════════════════════════════════════════════════
+
 elif st.session_state.etape == 2:
     st.title("🔄 Étape 2 : Entraînement en cours")
     st.divider()
 
-    # Résumé config — lecture seule
+    
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Stratégie", st.session_state.get("selected_strategy", "N/A"))
     c2.metric("Dataset", st.session_state.get("selected_dataset", "N/A"))
@@ -928,9 +921,9 @@ elif st.session_state.etape == 2:
     else:
         log_container.info("Initialisation du serveur Flower...")
 
-    # --- ÉTAT DU PROCESSUS ---
-    process_running = False
-    if st.session_state.fl_process is not None:
+    # etat du prorcesus 
+    process_running = False # part du principe qu'un processus n'est pas au cours d'excution 
+    if st.session_state.fl_process is not None: # verification de l'existence du processus 
         process_running = st.session_state.fl_process.poll() is None
 
     # Récupération du CSV de résultats si disponible
@@ -982,9 +975,7 @@ elif st.session_state.etape == 2:
         st.rerun()
 
 
-# ════════════════════════════════════════════════════════════════════
-# ÉCRAN 3
-# ════════════════════════════════════════════════════════════════════
+
 elif st.session_state.etape == 3:
 
     st.title("📊 Étape 3 : Résultats finaux")
@@ -994,15 +985,15 @@ elif st.session_state.etape == 3:
         if df_res is not None:
             pdf_path = Path(csv_path).parent / "rapport_green_fl_auto.pdf"
             
-            # Forcer la génération même s'il existe (pour le test)
+            
             try:
-                # On passe un maximum d'infos pour être sûr
+                
                 generate_pdf_report(df_res, st.session_state, save_path=str(pdf_path))
                 st.success(f"PDF créé : {pdf_path}")
             except Exception as e:
                 st.error(f"⚠️ ÉCHEC GÉNÉRATION PDF : {str(e)}")
                 import traceback
-                st.code(traceback.format_exc()) # Affiche la pile d'erreur complète
+                st.code(traceback.format_exc()) 
     output_dir = Path(csv_path).parent if csv_path else None
     global_accuracy = None
     if output_dir:
@@ -1165,13 +1156,13 @@ elif st.session_state.etape == 3:
                     use_container_width=True
                 )
             
-            # --- 2. FICHIER BILAN COMPLET (Comparaison + Réseau) ---
+            
             path_comp = get_latest_csv("em_comparison.json")
             if path_comp and path_comp.exists():
                 with open(path_comp, "r", encoding="utf-8") as f:
                     comp_data = json.load(f)
                 
-                # Petit rappel visuel des métriques réseau avant le bouton
+                
                 st.info(f"🌐 Réseau : {comp_data.get('network_transfer_gb', 0):.4f} GB")
                 
                 json_string = json.dumps(comp_data, indent=2)

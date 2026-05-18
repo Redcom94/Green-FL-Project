@@ -20,14 +20,14 @@ from pytorchexample.custom_strategy import (
 from pytorchexample.task import load_centralized_dataset, test
 
 try:
-    from pytorchexample.user_model import Net  # Modèle utilisateur
+    from pytorchexample.user_model import Net  
 except ImportError:
-    from pytorchexample.model import Net       # Modèle par défaut
+    from pytorchexample.model import Net       
 
 from codecarbon import EmissionsTracker
 CURRENT_SAVE_PATH = None
 ENERGY_PER_GB = 0.06
-# Dictionnaire de correspondance des stratégies
+# dictionnaire des strategy 
 STRATEGIES = {
     "fedavg": CustomFedAvg,
     "fedadam": CustomFedAdam,
@@ -35,11 +35,8 @@ STRATEGIES = {
     "fedprox": CustomFedProx,
     "fedadagrad": CustomFedAdagrad,
 }
-
 app = ServerApp()
-
 import requests
-
 def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
     """cette fonction sert a recuperer l'intensite en temps reel via electricite maps """
     try:
@@ -48,27 +45,24 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
             headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
             timeout=5
         )
+
+        #premier requette pour recuperer le facteur de carbon intensite actuelle de la zone cible belgique
         r2 = requests.get(
             f"https://api.electricitymap.org/v3/power-breakdown/latest?zone={zone}",
             headers={"auth-token": "x3Sd4MfSmzaXK6ppYtTd"},
             timeout=5
-        )
-
-
+        )#deuxiemme requette pour recuperer la repartition detaillée des sources d'energie qui alimentent le réseau à cet instant ( renouvelable , fossile ,nucléaire,wind ...)
+        # le time out de 5 seconde je l'ai mis au cas ou le serveur d'electricite maps ne repond pas à temps, la requette va etre interrompue pour eviter de bloquer l'application 
         d1=r1.json()
         d2=r2.json()
-
-
-
-
-        
+        #ces deux ligne pour convertir les donnees recupere en format  dictionnaire python 
         return {
             "zone": zone,
-            "realtime_carbon_intensity": d1.get("carbonIntensity"),
+            "realtime_carbon_intensity": d1.get("carbonIntensity"),  # extrait le taux d'emeission carbone actuelle en reseua electrique 
             "datetime": d1.get("datetime"),
-            "fossil_free_percentage": d2.get("fossilFreePercentage"),
-            # NOUVEAUX CHAMPS
-            "renewable_percentage":    d2.get("renewablePercentage"),
+            "fossil_free_percentage": d2.get("fossilFreePercentage"),# combustible fossile 
+            
+            "renewable_percentage":    d2.get("renewablePercentage"), # la part de l'energy renouvelable dans la production d'electricite
             "nuclear_mw":   d2.get("powerConsumptionBreakdown", {}).get("nuclear"),
             "wind_mw":      d2.get("powerConsumptionBreakdown", {}).get("wind"),
             "solar_mw":     d2.get("powerConsumptionBreakdown", {}).get("solar"),
@@ -77,24 +71,21 @@ def get_carbon_intensity_realtime(zone: str = "BE") -> dict:
         }
     except Exception as e:
         print(f" Electricity Maps indisponible : {e}")
-        return {"realtime_carbon_intensity": None}
+        return {"realtime_carbon_intensity": None}  
+    # except pour intrcepter erreur 
 
 def estimate_network_cost(model, num_rounds, clients_per_round):
     """Calcule le coût énergétique théorique du réseau."""
     # Sauvegarde temporaire pour mesurer la taille réelle
     torch.save(model.state_dict(), "temp_size.pt")
     model_size_gb = os.path.getsize("temp_size.pt") / (1024**3)
-    os.remove("temp_size.pt")
+    os.remove("temp_size.pt") #Supprime immédiatement le fichier temporaire du disque afin de libérer l'espace de stockag
 
-    # Total Data = (Model_Size * Clients * Rounds * 2) 
-    # Le * 2 compte l'aller (Download) et le retour (Upload)
+    # le volume total de données qui va transiter sur le reseau pendant toute la simulation selon l'equation suivante : 
     total_data_gb = model_size_gb * clients_per_round * num_rounds * 2
     network_energy_kwh = total_data_gb * ENERGY_PER_GB
     
     return total_data_gb, network_energy_kwh
-
-
-
 @app.main()
 def main(grid: Grid, context: Context) -> None:
 
@@ -124,14 +115,14 @@ def main(grid: Grid, context: Context) -> None:
     min_train = config.get("num-supernodes-training", 8)
     min_eval = config.get("num-supernodes-evaluation", 5)
 
-    # 2. Initialisation du modèle
+    # initilisation du modele 
     global_model = Net()
     model_path = Path("final_model.pt")
     if model_path.exists():
         global_model.load_state_dict(torch.load(model_path, map_location="cpu"))
     arrays = ArrayRecord(global_model.state_dict())
 
-    # 3. Configuration de la stratégie
+    # configuration de la strategie 
     strategy_kwargs = {
         "fraction_train": fraction_train,
         "fraction_evaluate": fraction_evaluate,
@@ -155,26 +146,24 @@ def main(grid: Grid, context: Context) -> None:
             })
 
     strategy = STRATEGIES[strategy_name](**strategy_kwargs)
-
-    # 4. Dossier de sortie
+    # 4dossier de sortie 
     current_time = datetime.now()
     run_dir = current_time.strftime("%Y-%m-%d/%H-%M-%S")
     save_path = Path.cwd() / f"outputs/{run_dir}"
     save_path.mkdir(parents=True, exist_ok=True)
     global CURRENT_SAVE_PATH
     CURRENT_SAVE_PATH = save_path
-    
     strategy.set_save_path(save_path)
     def evaluate_callable(server_round: int, arrays: ArrayRecord) -> MetricRecord:
         return global_evaluate(server_round, arrays, dataset_name, n_cls, img_size, num_channels)
     # 5. Lancement de l'entraînement avec suivi d'émissions
-    tracker = EmissionsTracker(
+    #lancement d'entrainement avec suivi d'emission 
+    tracker = EmissionsTracker(#
         project_name=strategy_name,
         output_dir=str(save_path),
         output_file="server_global_emissions.csv",
         measure_power_secs=15
     )
-
     #  Snapshot Electricity Maps avant l'entraînement
     em_before = get_carbon_intensity_realtime(zone="BE")
     if em_before["realtime_carbon_intensity"]:
@@ -210,23 +199,24 @@ def main(grid: Grid, context: Context) -> None:
         temp_csv = save_path / "temp_accuracy_metrics.csv"
         if main_csv.exists() and temp_csv.exists():
             try:
-                # 1. Lire le fichier principal (CodeCarbon utilise souvent la virgule par défaut)
+                # 1. Lire le fichier principal 
+                #lecture du fichier principale (ici ca a bugé pcq codecarbonn utilise souvent virgule par defaut)
                 df_main = pd.read_csv(main_csv) 
-                # 2. Lire vos métriques temporaires
+                # lecture des metricuqe
                 df_temp = pd.read_csv(temp_csv, sep=';')
                 
-                # 3. Fusion (Join) sur l'index ou le numéro de ligne 
-                # (En FL, 1 ligne CodeCarbon = 1 round, donc les index correspondent)
+                
                 df_final = pd.concat([df_main, df_temp[['carbon_per_accuracy', 'accuracy_gain']]], axis=1)
                 
-                # 4. Sauvegarde finale au format harmonisé (FR)
+                
+                #sauvegarde final au format harmonisé 
                 df_final.to_csv(main_csv, sep=';', decimal=',', index=False)
                 
-                # 5. Nettoyage du fichier temporaire
+                
                 temp_csv.unlink()
                 print("✅ Fusion des métriques Carbon/Accuracy réussie !")
             except Exception as e:
-                print(f"⚠️ Erreur lors de la fusion : {e}")
+                print(f" Erreur lors de la fusion : {e}")
         #  Snapshot Electricity Maps après l'entraînement + comparaison
         em_after = get_carbon_intensity_realtime(zone="BE")
         if em_before["realtime_carbon_intensity"] and em_after["realtime_carbon_intensity"]:
@@ -235,7 +225,8 @@ def main(grid: Grid, context: Context) -> None:
                 em_after["realtime_carbon_intensity"]
             ) / 2
             
-            # Lire l'énergie totale consommée depuis le CSV CodeCarbon
+            
+            #lecture de l'energie total consomme depuis le csv de codecarbon 
             emission_csv = save_path / "server_global_emissions.csv"
             if emission_csv.exists():
                 df_em = pd.read_csv(emission_csv)
@@ -266,7 +257,7 @@ def main(grid: Grid, context: Context) -> None:
                         num_rounds, 
                         int(min_available_nodes * fraction_train)
                     )
-                    # Sauvegarder la comparaison
+                    # sauvegarde de la comparaison em_compar 
                     comparison = {
                         "strategy": strategy_name,
                         "zone": "BE",
@@ -295,17 +286,18 @@ def main(grid: Grid, context: Context) -> None:
 
 
 
-        # --- CORRECTION DES DÉCIMALES ET FORMATS CSV ---
+        #correction des decimal en format csv 
         print("\n Harmonisation des fichiers CSV pour Excel FR...")
         fichiers_csv = list(save_path.glob("*.csv"))
         
         for csv_path in fichiers_csv:
             try:
-                # 1. On lit le fichier sans se soucier du séparateur
-                # On utilise engine='python' pour détecter si c'est déjà du ';' ou du ','
+                
+                #on lit le fichier 
+                #le engin=python pour detecter si le genre de separateur utilisait dans le fichier 
                 df_temp = pd.read_csv(csv_path, sep=None, engine='python')
                 
-                # 2. On s'assure que les colonnes numériques sont bien des nombres
+                
                 # Si Excel a déjà mis des virgules, on les remet en points pour que Pandas comprenne
                 cols_numeriques = ['emissions', 'emissions_rate', 'cpu_power', 'gpu_power', 
                                  'ram_power', 'cpu_energy', 'gpu_energy', 'ram_energy', 'energy_consumed']
@@ -315,17 +307,17 @@ def main(grid: Grid, context: Context) -> None:
                         # On force la conversion en numérique, au cas où c'est lu comme du texte
                         df_temp[col] = pd.to_numeric(df_temp[col].astype(str).str.replace(',', '.'), errors='coerce')
 
-                # 3. On sauvegarde proprement pour Excel FR
+                # 3sauvegarde pour excel 
                 # POINT-VIRGULE pour les colonnes, VIRGULE pour les décimales
                 df_temp.to_csv(csv_path, sep=';', decimal=',', index=False)
-                print(f" ✅ Nettoyage terminé pour : {csv_path.name}")
+                print(f"  Nettoyage terminé pour : {csv_path.name}")
             except Exception as e:
                 print(f"  Erreur sur {csv_path.name} : {e}")
 
         # Génération du graphique après conversion
         generate_emission_chart(save_path, strategy_name)
 
-    # 6. Sauvegarde du modèle final
+    # sauvegarde du modele final
     print("\n Sauvegarde du modèle final...")
     final_state_dict = result.arrays.to_torch_state_dict()
     torch.save(final_state_dict, save_path / "final_model.pt")
